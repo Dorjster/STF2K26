@@ -1,509 +1,407 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ── UTILITIES ─────────────────────────────────────────────────────────────
-function useInterval(cb, ms, active = true) {
-  const ref = useRef(cb);
-  useEffect(() => { ref.current = cb; }, [cb]);
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => ref.current(), ms);
-    return () => clearInterval(id);
-  }, [ms, active]);
-}
-
-function lerp(a, b, t) { return a + (b - a) * t; }
-
-function hexRgb(hex) {
-  if (!hex || hex.length < 4) return "255,255,255";
-  const h = hex.replace("#", "");
-  const full = h.length === 3 ? h.split("").map(c => c + c).join("") : h;
-  return [parseInt(full.slice(0,2),16), parseInt(full.slice(2,4),16), parseInt(full.slice(4,6),16)].join(",");
-}
-
-// ── PACKET ENGINE ──────────────────────────────────────────────────────────
-function usePackets(lines) {
-  const [packets, setPackets] = useState([]);
-  const idRef = useRef(0);
-  useInterval(() => {
-    setPackets(prev => {
-      const moved = prev.map(p => ({ ...p, t: p.t + p.speed })).filter(p => p.t < 1);
-      const newPkts = [];
-      lines.forEach(line => {
-        if (Math.random() < 0.28) {
-          const dir = Math.random() > 0.5;
-          idRef.current++;
-          newPkts.push({
-            id: idRef.current,
-            x1: dir ? line.x1 : line.x2, y1: dir ? line.y1 : line.y2,
-            x2: dir ? line.x2 : line.x1, y2: dir ? line.y2 : line.y1,
-            t: 0, speed: 0.006 + Math.random() * 0.005,
-            color: line.color || "#38bdf8",
-          });
-        }
-      });
-      return [...moved, ...newPkts].slice(-80);
-    });
-  }, 40);
-  return packets;
-}
-
-// ── DEVICE CHIP ────────────────────────────────────────────────────────────
-function DeviceChip({ label, color, compact }) {
-  return (
-    <div style={{
-      fontSize: compact ? 7 : 8, padding: compact ? "2px 5px" : "2px 7px", borderRadius: 4,
-      border: `1px solid rgba(${hexRgb(color)},0.25)`,
-      background: `rgba(${hexRgb(color)},0.08)`,
-      color, fontFamily: "'Share Tech Mono',monospace", whiteSpace: "nowrap",
-    }}>{label}</div>
-  );
-}
-
-// ── SITE BOX ───────────────────────────────────────────────────────────────
-function SiteBox({ title, color, accentColor, accessDevices, coreDevices, sdwan, extra, onClick, isActive, compact }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        border: `1.5px solid ${isActive ? color : hov ? color : "rgba(255,255,255,0.1)"}`,
-        borderRadius: 10, padding: compact ? "8px" : "10px",
-        background: isActive ? `rgba(${hexRgb(color)},0.06)` : "rgba(4,8,20,0.75)",
-        cursor: "pointer", transition: "all 0.2s",
-        position: "relative", width: "100%", boxSizing: "border-box",
-        height: "100%",
-      }}>
-      {/* Header */}
-      <div style={{
-        fontSize: compact ? 9 : 11, fontWeight: 700, color,
-        fontFamily: "'Share Tech Mono',monospace", letterSpacing: 2,
-        marginBottom: compact ? 5 : 7,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <span>{title}</span>
-        {sdwan && (
-          <div style={{
-            fontSize: compact ? 6 : 7, padding: "1px 5px", borderRadius: 3,
-            border: "1px solid rgba(56,189,248,0.4)", color: "#38bdf8",
-            background: "rgba(56,189,248,0.07)",
-          }}>SD-WAN</div>
-        )}
-      </div>
-      {/* CORE LAYER */}
-      <div style={{
-        border: `1px dashed rgba(${hexRgb(accentColor)},0.45)`,
-        borderRadius: 6, padding: compact ? "4px 5px" : "5px 7px", marginBottom: compact ? 4 : 5,
-        background: `rgba(${hexRgb(accentColor)},0.04)`,
-      }}>
-        <div style={{ fontSize: compact ? 6 : 7, color: accentColor, fontFamily: "'Share Tech Mono',monospace", letterSpacing: 2, marginBottom: compact ? 3 : 4, opacity: 0.8 }}>CORE LAYER</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: compact ? 2 : 3 }}>
-          {coreDevices.map((d, i) => <DeviceChip key={i} label={d} color={accentColor} compact={compact} />)}
-        </div>
-      </div>
-      {/* ACCESS LAYER */}
-      <div style={{
-        border: `1px dashed rgba(${hexRgb(color)},0.45)`,
-        borderRadius: 6, padding: compact ? "4px 5px" : "5px 7px",
-        background: `rgba(${hexRgb(color)},0.04)`,
-      }}>
-        <div style={{ fontSize: compact ? 6 : 7, color, fontFamily: "'Share Tech Mono',monospace", letterSpacing: 2, marginBottom: compact ? 3 : 4, opacity: 0.8 }}>ACCESS LAYER</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: compact ? 2 : 3 }}>
-          {accessDevices.map((d, i) => <DeviceChip key={i} label={d} color={color} compact={compact} />)}
-        </div>
-      </div>
-      {extra && <div style={{ marginTop: compact ? 4 : 6 }}>{extra}</div>}
-      {isActive && <div style={{ position:"absolute", inset:-3, borderRadius:12, border:`1.5px solid ${color}`, opacity:0.35, animation:"pulseRing 1.5s ease-out infinite", pointerEvents:"none" }} />}
-    </div>
-  );
-}
-
-// ── REMOTE BOX ─────────────────────────────────────────────────────────────
-function RemoteBox({ label, icon, compact, nodeRef }) {
-  return (
-    <div ref={nodeRef} style={{
-      border: "1px solid rgba(234,179,8,0.3)", borderRadius: 8,
-      padding: compact ? "6px 10px" : "8px 14px",
-      background: "rgba(4,8,20,0.7)", textAlign: "center",
-    }}>
-      <div style={{ fontSize: compact ? 16 : 20, marginBottom: 3 }}>{icon}</div>
-      <div style={{ fontSize: compact ? 7 : 8, color: "#eab308", fontFamily: "'Share Tech Mono',monospace", whiteSpace: "nowrap" }}>{label}</div>
-    </div>
-  );
-}
-
-// ── INET CLOUD ─────────────────────────────────────────────────────────────
-function InetCloud({ nodeRef, compact }) {
-  const r = compact ? 44 : 60;
-  const w = r * 2 + 40; const h = r + 50;
-  return (
-    <div ref={nodeRef} style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow:"visible" }}>
-        <defs>
-          <filter id="cglow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-        <ellipse cx={w/2} cy={h*0.6} rx={r} ry={r*0.52} fill="rgba(56,189,248,0.07)" stroke="rgba(56,189,248,0.4)" strokeWidth="1" filter="url(#cglow)" />
-        <ellipse cx={w/2-r*0.35} cy={h*0.52} rx={r*0.55} ry={r*0.44} fill="rgba(56,189,248,0.07)" stroke="rgba(56,189,248,0.28)" strokeWidth="0.8" />
-        <ellipse cx={w/2+r*0.35} cy={h*0.52} rx={r*0.55} ry={r*0.44} fill="rgba(56,189,248,0.07)" stroke="rgba(56,189,248,0.28)" strokeWidth="0.8" />
-        <ellipse cx={w/2} cy={h*0.38} rx={r*0.65} ry={r*0.48} fill="rgba(56,189,248,0.09)" stroke="rgba(56,189,248,0.4)" strokeWidth="1" />
-        <circle cx={w/2} cy={h*0.5} r={r*0.72} fill="none" stroke="rgba(56,189,248,0.12)" strokeWidth="0.8" strokeDasharray="4,8">
-          <animateTransform attributeName="transform" type="rotate" from={`0 ${w/2} ${h*0.5}`} to={`360 ${w/2} ${h*0.5}`} dur="18s" repeatCount="indefinite" />
-        </circle>
-        <text x={w/2} y={h*0.48} textAnchor="middle" fill="#38bdf8" fontSize={compact ? 11 : 14} fontFamily="'Share Tech Mono',monospace" fontWeight="700" fontStyle="italic">iNET</text>
-        <text x={w/2} y={h*0.62} textAnchor="middle" fill="rgba(56,189,248,0.45)" fontSize={compact ? 6 : 7} fontFamily="'Share Tech Mono',monospace">SD-WAN FABRIC</text>
-      </svg>
-    </div>
-  );
-}
-
-// ── DC EXTRA CONTENT ───────────────────────────────────────────────────────
-function DCExtra({ compact }) {
-  const servers = [{ l:"Storage",c:"#eab308" },{ l:"Mail Srv",c:"#10b981" },{ l:"AD",c:"#06b6d4" },{ l:"Web Srv",c:"#38bdf8" }];
-  const vms = [{ l:"Veeam",c:"#00ff9d" },{ l:"OPSWAT",c:"#06b6d4" },{ l:"Ivanti",c:"#f97316" },{ l:"SailPoint",c:"#eab308" },{ l:"Thales",c:"#8b5cf6" },{ l:"VMware",c:"#8b5cf6" }];
-  const chip = (item, i) => (
-    <div key={i} style={{ fontSize: compact ? 6 : 7, padding:"1px 5px", borderRadius:3, border:`1px solid rgba(${hexRgb(item.c)},0.3)`, background:`rgba(${hexRgb(item.c)},0.08)`, color:item.c, fontFamily:"'Share Tech Mono',monospace" }}>{item.l}</div>
-  );
-  return (
-    <div style={{ display:"flex", gap: compact ? 4 : 6 }}>
-      <div style={{ flex:1, border:"1px dashed rgba(239,68,68,0.28)", borderRadius:5, padding: compact ? "3px 4px" : "4px 6px", background:"rgba(239,68,68,0.03)" }}>
-        <div style={{ fontSize: compact ? 6 : 7, color:"#ef4444", fontFamily:"'Share Tech Mono',monospace", marginBottom:3 }}>SERVERS</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:2 }}>{servers.map(chip)}</div>
-      </div>
-      <div style={{ flex:1, border:"1px dashed rgba(139,92,246,0.28)", borderRadius:5, padding: compact ? "3px 4px" : "4px 6px", background:"rgba(139,92,246,0.03)" }}>
-        <div style={{ fontSize: compact ? 6 : 7, color:"#8b5cf6", fontFamily:"'Share Tech Mono',monospace", marginBottom:3 }}>VM / SECURITY</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:2 }}>{vms.map(chip)}</div>
-      </div>
-    </div>
-  );
-}
-
-// ── SITE DATA ──────────────────────────────────────────────────────────────
-const SITE_DATA = {
-  hq: { title:"HQ", color:"#06b6d4", accentColor:"#0e7490", sdwan:true, coreDevices:["FW-01 Active","FW-02 Standby","Core SW-01","Core SW-02"], accessDevices:["SW-A1 48p","SW-A2 48p","SW-A3 24p","WAP ×12","IP Phones ×85"] },
-  dc: { title:"DC", color:"#f97316", accentColor:"#c2410c", sdwan:true, coreDevices:["Core SW-01 L3","Core SW-02 L3","FW Cluster HA","IDS/IPS Inline"], accessDevices:["SAN 32TB NVMe","Object 200TB","SOBR (Veeam)","Tape LTO-9"] },
-  b1: { title:"Branch-1", color:"#10b981", accentColor:"#047857", sdwan:true, coreDevices:["FW-01 Active","FW-02 Standby","Core SW-01","Core SW-02"], accessDevices:["SW-A1 48p","SW-A2 48p","SW-A3 48p","WAP ×8","IP Phones ×40"] },
-  b2: { title:"Branch-2", color:"#8b5cf6", accentColor:"#6d28d9", sdwan:true, coreDevices:["FW-01 Active","FW-02 Standby","Core SW-01","Core SW-02"], accessDevices:["SW-A1 48p","SW-A2 48p","SW-A3 48p","SW-A4 48p","WAP ×10"] },
+const Icon = {
+  server:  (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r=".9" fill="currentColor"/><circle cx="7" cy="17" r=".9" fill="currentColor"/><line x1="11" y1="7" x2="17" y2="7"/><line x1="11" y1="17" x2="17" y2="17"/></svg>,
+  desktop: (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  laptop:  (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>,
+  phone:   (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="7" y="2" width="10" height="20" rx="2"/><circle cx="12" cy="17" r=".8" fill="currentColor"/></svg>,
+  printer: (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
+  camera:  (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  switch:  (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="6" y1="12" x2="6" y2="12" strokeWidth="3"/><line x1="10" y1="12" x2="10" y2="12" strokeWidth="3"/><line x1="14" y1="12" x2="14" y2="12" strokeWidth="3"/><line x1="18" y1="12" x2="18" y2="12" strokeWidth="3"/></svg>,
+  firewall:(p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2L4 6v6c0 5 4 9.5 8 11 4-1.5 8-6 8-11V6z"/><path d="M9 12l2 2 4-4"/></svg>,
+  storage: (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+  cloud:   (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>,
+  backup:  (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.98"/></svg>,
+  mail:    (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  web:     (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  ad:      (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  sdwan:   (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+  tape:    (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="3"/><circle cx="16" cy="12" r="3"/><line x1="11" y1="12" x2="13" y2="12"/></svg>,
+  iot:     (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M5.5 5.5A9.6 9.6 0 0 0 3 12a9.6 9.6 0 0 0 2.5 6.5"/><path d="M18.5 5.5A9.6 9.6 0 0 1 21 12a9.6 9.6 0 0 1-2.5 6.5"/><path d="M7.5 7.5A6.5 6.5 0 0 0 5.5 12a6.5 6.5 0 0 0 2 4.5"/><path d="M16.5 7.5A6.5 6.5 0 0 1 18.5 12a6.5 6.5 0 0 1-2 4.5"/></svg>,
+  vm:      (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="5" y="6" width="6" height="5" rx="1"/><rect x="13" y="6" width="6" height="5" rx="1"/><line x1="7" y1="17" x2="17" y2="17"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+  close:   (p={}) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 };
 
-// ── CONNECTION LINES OVERLAY ───────────────────────────────────────────────
-function ConnectionLines({ nodeRefs, containerRef, compact }) {
-  const [lines, setLines] = useState([]);
+const SITES = {
+  hq: { id:"hq", label:"HQ",  sub:"Headquarters",      col:"#5b8def", col2:"#6366f1", floors:6 },
+  dc: { id:"dc", label:"DC",  sub:"Data Center",        col:"#f97316", col2:"#ef4444", floors:8 },
+  dr: { id:"dr", label:"DR",  sub:"Disaster Recovery",  col:"#8b5cf6", col2:"#ec4899", floors:5 },
+  b1: { id:"b1", label:"B1",  sub:"Branch Office 1",    col:"#10b981", col2:"#06b6d4", floors:3 },
+  b2: { id:"b2", label:"B2",  sub:"Branch Office 2",    col:"#10b981", col2:"#06b6d4", floors:3 },
+};
 
-  const recalc = useCallback(() => {
-    if (!containerRef.current) return;
-    const base = containerRef.current.getBoundingClientRect();
-    const center = (ref) => {
-      if (!ref?.current) return null;
-      const r = ref.current.getBoundingClientRect();
-      return { x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height / 2 };
-    };
-    const cloud = center(nodeRefs.cloud);
-    if (!cloud) return;
-    const cfg = [
-      { ref:nodeRefs.hq,  color:"#06b6d4", label:"90%", health:"good" },
-      { ref:nodeRefs.dc,  color:"#f97316", label:"88%", health:"good" },
-      { ref:nodeRefs.b1,  color:"#10b981", label:"65%", health:"good" },
-      { ref:nodeRefs.b2,  color:"#8b5cf6", label:"50%", health:"warn" },
-      { ref:nodeRefs.rw1, color:"#eab308", label:"30%", health:"good", vpn:true },
-      { ref:nodeRefs.rw2, color:"#eab308", label:"25%", health:"good", vpn:true },
-    ];
-    const newLines = cfg.map(c => {
-      const pos = center(c.ref);
-      if (!pos) return null;
-      return { ...c, x1:pos.x, y1:pos.y, x2:cloud.x, y2:cloud.y };
-    }).filter(Boolean);
-    setLines(newLines);
-  }, [nodeRefs, containerRef]);
+const SITE_DEVICES = {
+  hq:[
+    {id:"hq-pc1",  label:"PC-001",   type:"desktop", ip:"10.1.1.10", os:"Windows 11"},
+    {id:"hq-pc2",  label:"PC-002",   type:"desktop", ip:"10.1.1.11", os:"Windows 11"},
+    {id:"hq-lap1", label:"Laptop-A", type:"laptop",  ip:"10.1.1.20", os:"macOS 14"},
+    {id:"hq-lap2", label:"Laptop-B", type:"laptop",  ip:"10.1.1.21", os:"Windows 11"},
+    {id:"hq-mob1", label:"iPhone-1", type:"phone",   ip:"10.1.1.30", os:"iOS 17"},
+    {id:"hq-mob2", label:"Android",  type:"phone",   ip:"10.1.1.31", os:"Android 14"},
+    {id:"hq-prt",  label:"Printer",  type:"printer", ip:"10.1.1.40", os:"Embedded"},
+    {id:"hq-cam",  label:"IP-Cam",   type:"camera",  ip:"10.1.1.50", os:"IoT FW"},
+    {id:"hq-iot",  label:"IoT Hub",  type:"iot",     ip:"10.1.1.60", os:"RTOS"},
+  ],
+  b1:[
+    {id:"b1-pc1",  label:"PC-101",   type:"desktop", ip:"10.2.1.10", os:"Windows 11"},
+    {id:"b1-pc2",  label:"PC-102",   type:"desktop", ip:"10.2.1.11", os:"Windows 10"},
+    {id:"b1-lap",  label:"Laptop-C", type:"laptop",  ip:"10.2.1.20", os:"Windows 11"},
+    {id:"b1-mob",  label:"iPhone-2", type:"phone",   ip:"10.2.1.30", os:"iOS 17"},
+    {id:"b1-prt",  label:"Printer",  type:"printer", ip:"10.2.1.40", os:"Embedded"},
+  ],
+  b2:[
+    {id:"b2-pc1",  label:"PC-201",   type:"desktop", ip:"10.3.1.10", os:"Windows 11"},
+    {id:"b2-pc2",  label:"PC-202",   type:"desktop", ip:"10.3.1.11", os:"Windows 11"},
+    {id:"b2-lap",  label:"Laptop-D", type:"laptop",  ip:"10.3.1.20", os:"macOS 14"},
+    {id:"b2-mob",  label:"Android",  type:"phone",   ip:"10.3.1.30", os:"Android 14"},
+    {id:"b2-cam",  label:"IP-Cam",   type:"camera",  ip:"10.3.1.50", os:"IoT FW"},
+  ],
+};
 
-  useEffect(() => {
-    recalc();
-    const t1 = setTimeout(recalc, 100);
-    const t2 = setTimeout(recalc, 400);
-    window.addEventListener("resize", recalc);
-    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener("resize", recalc); };
-  }, [recalc]);
+const DC_LAYERS = [
+  {id:"sdwan-dc", label:"SD-WAN Edge",    icon:"sdwan",    col:"#5b8def", x:50, y:9},
+  {id:"fw1-dc",   label:"FW-01 Active",   icon:"firewall", col:"#ef4444", x:28, y:22},
+  {id:"fw2-dc",   label:"FW-02 Standby",  icon:"firewall", col:"#ef4444", x:62, y:22},
+  {id:"sw-core",  label:"Core Switch L3", icon:"switch",   col:"#10b981", x:45, y:36},
+  {id:"vmware",   label:"VMware Cluster", icon:"vm",       col:"#8b5cf6", x:14, y:52},
+  {id:"mail",     label:"Mail Server",    icon:"mail",     col:"#06b6d4", x:34, y:52},
+  {id:"web",      label:"Web Server",     icon:"web",      col:"#5b8def", x:55, y:52},
+  {id:"ad",       label:"Active Dir.",    icon:"ad",       col:"#f97316", x:76, y:52},
+  {id:"veeam",    label:"Veeam B&R v12",  icon:"backup",   col:"#10b981", x:22, y:70},
+  {id:"san",      label:"SAN Storage",    icon:"storage",  col:"#eab308", x:45, y:70},
+  {id:"tape",     label:"Tape Library",   icon:"tape",     col:"#6366f1", x:70, y:70},
+];
 
-  const packets = usePackets(lines);
-  const hc = h => h === "good" ? "#10b981" : "#eab308";
+const DR_LAYERS = [
+  {id:"sdwan-dr", label:"SD-WAN Edge",    icon:"sdwan",    col:"#8b5cf6", x:50, y:9},
+  {id:"fw-dr",    label:"FW Cluster",     icon:"firewall", col:"#ef4444", x:35, y:22},
+  {id:"sw-dr",    label:"Core Switch",    icon:"switch",   col:"#10b981", x:50, y:36},
+  {id:"vm-dr",    label:"VMware DR",      icon:"vm",       col:"#8b5cf6", x:22, y:52},
+  {id:"rep",      label:"Veeam Replica",  icon:"backup",   col:"#10b981", x:50, y:52},
+  {id:"stor-dr",  label:"DR Storage",     icon:"storage",  col:"#eab308", x:74, y:52},
+];
 
-  return (
-    <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", pointerEvents:"none", overflow:"visible", zIndex:5 }}>
-      <defs>
-        <filter id="lg"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
-      {lines.map((line, i) => (
-        <g key={i}>
-          <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke="#000" strokeWidth={3} opacity={0.5} />
-          <line x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-            stroke={hc(line.health)} strokeWidth={line.vpn ? 1.2 : 1.8}
-            strokeDasharray={line.vpn ? "5,5" : "12,6"} opacity={0.7} filter="url(#lg)">
-            <animate attributeName="stroke-dashoffset" from="18" to="0" dur={`${1.0+i*0.1}s`} repeatCount="indefinite" />
-          </line>
-          {!compact && (
-            <text x={(line.x1+line.x2)/2} y={(line.y1+line.y2)/2-7}
-              fill={hc(line.health)} fontSize="8" textAnchor="middle"
-              fontFamily="'Share Tech Mono',monospace" opacity={0.8}>{line.label}</text>
-          )}
-        </g>
-      ))}
-      {packets.map(p => {
-        const x = lerp(p.x1, p.x2, p.t);
-        const y = lerp(p.y1, p.y2, p.t);
-        return (
-          <g key={p.id}>
-            <circle cx={x} cy={y} r={2.5} fill={p.color} filter="url(#lg)" opacity={0.9} />
-            <circle cx={x} cy={y} r={6} fill="none" stroke={p.color} strokeWidth={0.6} opacity={0.28} />
-          </g>
-        );
-      })}
-    </svg>
-  );
+function getTrafficHops(site) {
+  if (site === "b1" || site === "b2") return [
+    {label:"Access Switch",  icon:"switch",   col:"#10b981", ms:0},
+    {label:"Core Switch",    icon:"switch",   col:"#10b981", ms:120},
+    {label:"SD-WAN Edge",    icon:"sdwan",    col:"#06b6d4", ms:260},
+    {label:"iNET Fabric",    icon:"cloud",    col:"#8b5cf6", ms:400},
+    {label:"DC Firewall",    icon:"firewall", col:"#ef4444", ms:540},
+    {label:"DC Core SW",     icon:"switch",   col:"#f97316", ms:680},
+  ];
+  return [
+    {label:"Access Switch",  icon:"switch",   col:"#5b8def", ms:0},
+    {label:"Core Switch",    icon:"switch",   col:"#5b8def", ms:120},
+    {label:"Firewall",       icon:"firewall", col:"#ef4444", ms:260},
+    {label:"SD-WAN Edge",    icon:"sdwan",    col:"#06b6d4", ms:400},
+    {label:"iNET / Cloud",   icon:"cloud",    col:"#8b5cf6", ms:540},
+  ];
 }
 
-// ── TOPOLOGY DIAGRAM ───────────────────────────────────────────────────────
-function TopologyDiagram({ onSiteClick, activeSite }) {
-  const containerRef = useRef(null);
-  const [w, setW] = useState(1000);
+/* --- Building SVG --- */
+function Building({ site, onClick, isActive }) {
+  const s = SITES[site];
+  const W = s.floors >= 6 ? 80 : 62;
+  const H = s.floors * 18 + 20;
+  const totalH = H + 40;
 
-  const nodeRefs = {
-    hq: useRef(null), dc: useRef(null),
-    b1: useRef(null), b2: useRef(null),
-    rw1: useRef(null), rw2: useRef(null),
-    cloud: useRef(null),
-  };
-
-  useEffect(() => {
-    const update = () => containerRef.current && setW(containerRef.current.offsetWidth);
-    update(); window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  const compact = w < 700;
-  const mobile = w < 500;
-
-  if (mobile) {
-    // ── MOBILE LAYOUT ────────────────────────────────────────────────────
-    return (
-      <div ref={containerRef} style={{ width:"100%", height:"100%", overflowY:"auto", padding:10, boxSizing:"border-box", position:"relative" }}>
-        <ConnectionLines nodeRefs={nodeRefs} containerRef={containerRef} compact />
-        <div style={{ display:"flex", flexDirection:"column", gap:8, position:"relative", zIndex:10 }}>
-          <div ref={nodeRefs.hq}><SiteBox {...SITE_DATA.hq} compact onClick={() => onSiteClick("hq")} isActive={activeSite==="hq"} /></div>
-          <div ref={nodeRefs.dc}><SiteBox {...SITE_DATA.dc} compact onClick={() => onSiteClick("dc")} isActive={activeSite==="dc"} extra={<DCExtra compact />} /></div>
-          <div style={{ display:"flex", justifyContent:"center" }} ref={nodeRefs.cloud}><InetCloud nodeRef={nodeRefs.cloud} compact /></div>
-          <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-            <div ref={nodeRefs.rw1}><RemoteBox label="Remote-1" icon="🖥️" compact /></div>
-            <div ref={nodeRefs.rw2}><RemoteBox label="Remote-2" icon="📱" compact /></div>
-          </div>
-          <div ref={nodeRefs.b1}><SiteBox {...SITE_DATA.b1} compact onClick={() => onSiteClick("b1")} isActive={activeSite==="b1"} /></div>
-          <div ref={nodeRefs.b2}><SiteBox {...SITE_DATA.b2} compact onClick={() => onSiteClick("b2")} isActive={activeSite==="b2"} /></div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── DESKTOP / TABLET: PDF-accurate 3×3 grid ──────────────────────────
-  // Columns: left-site | center(cloud/remotes) | right-site
-  // Rows:    top(HQ|DC) | center(cloud) | bottom(B1|remotes|B2)
   return (
-    <div ref={containerRef} style={{ width:"100%", height:"100%", padding: compact ? 8 : 14, boxSizing:"border-box", position:"relative" }}>
-      <ConnectionLines nodeRefs={nodeRefs} containerRef={containerRef} compact={compact} />
-
+    <div onClick={onClick} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,cursor:"pointer"}}>
       <div style={{
-        display:"grid",
-        gridTemplateColumns:"5fr 3fr 5fr",
-        gridTemplateRows:"1fr auto 1fr",
-        gap: compact ? 8 : 14,
-        height:"100%",
-        position:"relative", zIndex:10,
+        position:"relative",
+        filter: isActive ? `drop-shadow(0 0 14px ${s.col}99)` : "none",
+        transition:"filter 0.3s",
       }}>
-        {/* R1C1: HQ */}
-        <div ref={nodeRefs.hq} style={{ gridColumn:1, gridRow:1 }}>
-          <SiteBox {...SITE_DATA.hq} compact={compact} onClick={() => onSiteClick("hq")} isActive={activeSite==="hq"} />
-        </div>
-        {/* R1C2: empty top */}
-        <div style={{ gridColumn:2, gridRow:1 }} />
-        {/* R1C3: DC */}
-        <div ref={nodeRefs.dc} style={{ gridColumn:3, gridRow:1 }}>
-          <SiteBox {...SITE_DATA.dc} compact={compact} onClick={() => onSiteClick("dc")} isActive={activeSite==="dc"} extra={<DCExtra compact={compact} />} />
-        </div>
-
-        {/* R2C1: empty */}
-        <div style={{ gridColumn:1, gridRow:2 }} />
-        {/* R2C2: iNET cloud CENTER */}
-        <div style={{ gridColumn:2, gridRow:2, display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <InetCloud nodeRef={nodeRefs.cloud} compact={compact} />
-          {/* invisible anchor for connection lines */}
-          <div ref={nodeRefs.cloud} style={{ position:"absolute", width:1, height:1, opacity:0, pointerEvents:"none" }} />
-        </div>
-        {/* R2C3: empty */}
-        <div style={{ gridColumn:3, gridRow:2 }} />
-
-        {/* R3C1: Branch-1 */}
-        <div ref={nodeRefs.b1} style={{ gridColumn:1, gridRow:3 }}>
-          <SiteBox {...SITE_DATA.b1} compact={compact} onClick={() => onSiteClick("b1")} isActive={activeSite==="b1"} />
-        </div>
-        {/* R3C2: Remote workers */}
-        <div style={{ gridColumn:2, gridRow:3, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap: compact ? 8 : 12 }}>
-          <div ref={nodeRefs.rw1}><RemoteBox label="Remote worker-1" icon="🖥️" compact={compact} /></div>
-          <div ref={nodeRefs.rw2}><RemoteBox label="Remote worker-2" icon="📱" compact={compact} /></div>
-        </div>
-        {/* R3C3: Branch-2 */}
-        <div ref={nodeRefs.b2} style={{ gridColumn:3, gridRow:3 }}>
-          <SiteBox {...SITE_DATA.b2} compact={compact} onClick={() => onSiteClick("b2")} isActive={activeSite==="b2"} />
-        </div>
+        <svg width={W} height={totalH} viewBox={`0 0 ${W} ${totalH}`} style={{overflow:"visible"}}>
+          <defs>
+            <linearGradient id={`g-${site}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={s.col}/>
+              <stop offset="100%" stopColor={s.col2}/>
+            </linearGradient>
+          </defs>
+          {/* Shadow */}
+          <ellipse cx={W/2} cy={totalH-6} rx={W*0.45} ry={5} fill={s.col} opacity="0.15"/>
+          {/* Building body fill */}
+          <rect x="4" y="20" width={W-8} height={H-20} rx="3" fill={`url(#g-${site})`} opacity="0.1"/>
+          {/* Building outline */}
+          <rect x="4" y="20" width={W-8} height={H-20} rx="3"
+            fill="none" stroke={s.col} strokeWidth={isActive?2:1.5} opacity={isActive?1:0.7}/>
+          {/* Floors */}
+          {Array.from({length:s.floors-1}).map((_,i)=>(
+            <line key={i} x1="4" y1={H-((i+1)*18)} x2={W-4} y2={H-((i+1)*18)}
+              stroke={s.col} strokeWidth="0.5" opacity="0.35"/>
+          ))}
+          {/* Windows */}
+          {Array.from({length:s.floors}).map((_,fi)=>
+            [12,W/2-6,W-24].map((wx,wi)=>{
+              const lit=(fi*3+wi)%4!==0;
+              return <rect key={`${fi}-${wi}`} x={wx} y={H-((fi+1)*18)+5}
+                width="10" height="8" rx="1"
+                fill={lit?s.col:"transparent"}
+                stroke={s.col} strokeWidth="0.5"
+                opacity={lit?0.65:0.25}/>;
+            })
+          )}
+          {/* Antenna for big buildings */}
+          {s.floors >= 5 && <>
+            <line x1={W/2} y1="20" x2={W/2} y2="4" stroke={s.col} strokeWidth="1.5"/>
+            <circle cx={W/2} cy="3" r="3.5" fill={s.col} opacity="0.9">
+              <animate attributeName="opacity" values="0.9;0.2;0.9" dur="2s" repeatCount="indefinite"/>
+            </circle>
+          </>}
+          {/* Name banner */}
+          <rect x="4" y={H} width={W-8} height={16} rx="0 0 3 3" fill={s.col} opacity="0.92"/>
+          <text x={W/2} y={H+11} textAnchor="middle" fontSize="7.5"
+            fontWeight="800" fill="#fff" fontFamily="JetBrains Mono,monospace" letterSpacing="0.12em">
+            {s.label}
+          </text>
+          {/* Active ring */}
+          {isActive && <rect x="1" y="17" width={W-2} height={H+2} rx="5"
+            fill="none" stroke={s.col} strokeWidth="2.5" strokeDasharray="5,3" opacity="0.7">
+            <animate attributeName="stroke-dashoffset" from="8" to="0" dur="0.5s" repeatCount="indefinite"/>
+          </rect>}
+        </svg>
       </div>
+      <div style={{
+        fontSize:10, fontWeight:700, color: isActive?s.col:"var(--ink-3)",
+        fontFamily:"JetBrains Mono,monospace", letterSpacing:"0.1em",
+        textAlign:"center", maxWidth:100, lineHeight:1.3,
+        transition:"color 0.2s",
+      }}>{s.sub}</div>
     </div>
   );
 }
 
-// ── VEEAM DATA ─────────────────────────────────────────────────────────────
-const VEEAM_STEPS = [
-  { id:0, icon:"💻", color:"#38bdf8", label:"Endpoint Discovery", desc:"Veeam auto-discovers all protected workloads across HQ, Branch, and Remote sites via the VBR console.", detail:["Agentless VMware / Hyper-V inventory","Agent-based physical servers","Cloud workload discovery","Continuous auto-refresh"] },
-  { id:1, icon:"📸", color:"#06b6d4", label:"App-Consistent Snapshot", desc:"VSS and VMware snapshot APIs quiesce applications before capture — guaranteeing zero data loss.", detail:["VSS for Exchange, SQL, AD","VMware vSphere (no stun)","Oracle RMAN integration","Hyper-V WMI checkpoint"] },
-  { id:2, icon:"⚙️",  color:"#10b981", label:"Backup Proxy Processing", desc:"Backup Proxy offloads data processing from the VBR server. Multiple proxies load-balance automatically.", detail:["Hot-Add / Direct NFS / NBD","Automatic load balancing","WAN Accelerator for branches","On-host vs off-host proxy"] },
-  { id:3, icon:"🗜️", color:"#eab308", label:"Inline Compression", desc:"All data compressed inline before writing — reducing storage footprint by up to 50%.", detail:["LZ4 ultra-fast (default)","ZSTD high compression ~50%","Per-job level tuning","Intel QAT acceleration"] },
-  { id:4, icon:"♻️",  color:"#f97316", label:"Block-Level Deduplication", desc:"Block-level deduplication eliminates redundant blocks. Combined with SOBR, ratios reach 5–10×.", detail:["Inline source-side dedupe","Changed Block Tracking (CBT)","Scale-Out Backup Repository","HPE/Dell DataDomain integration"] },
-  { id:5, icon:"💾", color:"#8b5cf6", label:"Repository + Immutability", desc:"Data written to SOBR with immutability — ransomware cannot delete backup data even with admin credentials.", detail:["Scale-Out Backup Repo (SOBR)","Linux Hardened Repository","S3 Object Lock on cloud tier","Auto capacity-tier offload"] },
-  { id:6, icon:"📋", color:"#38bdf8", label:"3-2-1-1-0 Backup Copy", desc:"Backup Copy Jobs replicate to secondary location automatically enforcing the 3-2-1-1-0 rule.", detail:["GFS retention policy","Seeding for remote sites","Cloud or tape replication","SureBackup verification"] },
-  { id:7, icon:"🔄", color:"#10b981", label:"VM Replication to DR", desc:"Continuous VM replication creates ready replicas at DR site. RPO as low as 15 minutes.", detail:["vSphere / Hyper-V native","RPO as low as 15 minutes","Planned failover, no data loss","Partial VM failover support"] },
-  { id:8, icon:"⚡", color:"#ffd700", label:"Instant Recovery", desc:"Instant VM Recovery starts VMs directly from backup storage in under 2 minutes.", detail:["Instant VM Recovery","Instant Disk (iSCSI mount)","Granular file/app-item restore","Secure Restore anti-malware"] },
-];
+/* --- Animated Overview Map --- */
+function OverviewMap({ activeSite, onSiteClick }) {
+  // Positions (% of container)
+  const positions = {
+    hq:{x:9,y:28}, b1:{x:9,y:62}, b2:{x:45,y:72},
+    dc:{x:78,y:20}, dr:{x:78,y:62},
+  };
+  const inet = {x:50,y:44};
 
-const VEEAM_ADV = [
-  { icon:"🛡️", title:"Ransomware-Proof",  body:"Linux Hardened Repo + S3 Object Lock — attackers can't delete backups even with admin credentials." },
-  { icon:"⚡", title:"2-Min RTO",          body:"Instant VM Recovery runs directly from backup storage. No full restore needed." },
-  { icon:"♻️",  title:"15-Min RPO",         body:"CBT incremental + continuous VM replication reaches RPO of 15 minutes." },
-  { icon:"🌐", title:"Any Workload",        body:"VMware, Hyper-V, AWS, Azure, GCP, physical, NAS, Kubernetes — one platform." },
-  { icon:"🔍", title:"SureBackup Verified", body:"Every VM booted in isolated Virtual Lab and tested. Zero silent failures." },
-  { icon:"📊", title:"Single Pane",         body:"Veeam ONE provides unified monitoring, alerting, and reporting across all sites." },
-];
-
-// ── VEEAM PAGE ─────────────────────────────────────────────────────────────
-function VeeamPage() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const step = VEEAM_STEPS[activeStep];
-
-  useInterval(() => {
-    if (!autoPlay) return;
-    setProgress(p => {
-      if (p >= 100) { setActiveStep(s => (s+1) % VEEAM_STEPS.length); return 0; }
-      return p + 1.5;
-    });
-  }, 60, autoPlay);
+  const links = [
+    {from:"hq", col:"#5b8def", bw:"90%", dur:"1.8s"},
+    {from:"dc", col:"#f97316", bw:"88%", dur:"1.6s"},
+    {from:"dr", col:"#8b5cf6", bw:"50%", dur:"2.2s"},
+    {from:"b1", col:"#10b981", bw:"65%", dur:"2s"},
+    {from:"b2", col:"#10b981", bw:"50%", dur:"2.4s"},
+  ];
 
   return (
-    <div style={{ padding:"18px 20px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-        <div style={{ padding:"3px 10px", borderRadius:20, background:"rgba(0,255,157,0.08)", border:"1px solid rgba(0,255,157,0.3)", fontSize:9, color:"#00ff9d", fontFamily:"'Share Tech Mono',monospace", letterSpacing:2 }}>VEEAM B&R v12</div>
-        <div style={{ width:5, height:5, borderRadius:"50%", background:"#10b981", animation:"blink 1.5s infinite" }} />
-      </div>
-      <h2 style={{ margin:"0 0 4px", fontSize:18, fontWeight:700, color:"#fff", fontFamily:"'Orbitron',sans-serif" }}>Full Workload Backup</h2>
-      <p style={{ margin:"0 0 14px", fontSize:11, color:"rgba(255,255,255,0.4)" }}>9-step workflow · HQ, DC, Branches, Remote Workers</p>
+    <div style={{position:"relative",width:"100%",height:420}}>
+      <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 900 420" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          {links.map(l=>(
+            <marker key={l.from} id={`ar-${l.from}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M2 1L8 5L2 9" fill="none" stroke={l.col} strokeWidth="1.5"/>
+            </marker>
+          ))}
+        </defs>
 
-      {/* Steps */}
-      <div style={{ display:"flex", flexDirection:"column", gap:5, marginBottom:14 }}>
-        {VEEAM_STEPS.map((s, i) => {
-          const isA = activeStep === i;
+        {/* iNET cloud */}
+        <ellipse cx="450" cy="185" rx="58" ry="38" fill="rgba(91,141,239,0.07)" stroke="#5b8def" strokeWidth="1" strokeDasharray="5,3"/>
+        <text x="450" y="181" textAnchor="middle" fontSize="11" fill="#5b8def" fontFamily="JetBrains Mono,monospace" fontWeight="700">iNET</text>
+        <text x="450" y="197" textAnchor="middle" fontSize="9" fill="#8b93ab" fontFamily="JetBrains Mono,monospace">SD-WAN Fabric</text>
+
+        {/* Animated links */}
+        {links.map(l=>{
+          const p = positions[l.from];
+          const x1=p.x/100*900, y1=p.y/100*420;
+          const x2=450, y2=185;
+          const mx=(x1+x2)/2, my=(y1+y2)/2 - 20;
           return (
-            <div key={s.id} onClick={() => { setActiveStep(i); setAutoPlay(false); setProgress(0); }}
-              style={{ cursor:"pointer", padding:"9px 11px", borderRadius:7, border:`1.5px solid ${isA ? s.color : "rgba(255,255,255,0.06)"}`, background: isA ? `rgba(${hexRgb(s.color)},0.08)` : "rgba(255,255,255,0.02)", transition:"all 0.18s" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-                <div style={{ width:28, height:28, borderRadius:6, flexShrink:0, background:`rgba(${hexRgb(s.color)},0.15)`, border:`1px solid rgba(${hexRgb(s.color)},0.3)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>{s.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color: isA ? s.color : "rgba(255,255,255,0.35)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:1 }}>STEP {s.id+1}</div>
-                  <div style={{ fontSize:11, fontWeight:600, color: isA ? "#fff" : "rgba(255,255,255,0.65)" }}>{s.label}</div>
-                </div>
-                {isA && autoPlay && (
-                  <div style={{ width:32, height:3, borderRadius:2, background:"rgba(255,255,255,0.07)", overflow:"hidden", flexShrink:0 }}>
-                    <div style={{ height:"100%", width:`${progress}%`, background:s.color, transition:"width 0.06s linear" }} />
-                  </div>
-                )}
+            <g key={l.from}>
+              <path d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`} fill="none"
+                stroke={l.col} strokeWidth="1.5" strokeDasharray="8,5" opacity="0.45">
+                <animate attributeName="stroke-dashoffset" from="13" to="0" dur={l.dur} repeatCount="indefinite"/>
+              </path>
+              {/* Packet 1 */}
+              <circle r="4.5" fill={l.col} opacity="0.85">
+                <animateMotion dur={l.dur} repeatCount="indefinite">
+                  <mpath href={`#lp-${l.from}`}/>
+                </animateMotion>
+              </circle>
+              {/* Packet 2 offset */}
+              <circle r="3.5" fill={l.col} opacity="0.55">
+                <animateMotion dur={l.dur} repeatCount="indefinite" begin={`-${parseFloat(l.dur)/2}s`}>
+                  <mpath href={`#lp-${l.from}`}/>
+                </animateMotion>
+              </circle>
+              <path id={`lp-${l.from}`} d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`} fill="none"/>
+              {/* BW label */}
+              <text x={mx} y={my-6} textAnchor="middle" fontSize="9" fill={l.col}
+                fontFamily="JetBrains Mono,monospace" opacity="0.7">{l.bw}</text>
+            </g>
+          );
+        })}
+
+        {/* DC ↔ DR replication */}
+        <line x1="702" y1="105" x2="702" y2="260" stroke="#8b5cf6" strokeWidth="2" strokeDasharray="5,3" opacity="0.5"/>
+        <text x="716" y="185" fontSize="9" fill="#8b5cf6" fontFamily="JetBrains Mono,monospace" opacity="0.8">REPL</text>
+        <circle r="3.5" fill="#8b5cf6" opacity="0.85">
+          <animateMotion dur="1.4s" repeatCount="indefinite">
+            <mpath href="#lp-repl"/>
+          </animateMotion>
+        </circle>
+        <circle r="3.5" fill="#8b5cf6" opacity="0.55">
+          <animateMotion dur="1.4s" repeatCount="indefinite" begin="-0.7s">
+            <mpath href="#lp-repl"/>
+          </animateMotion>
+        </circle>
+        <path id="lp-repl" d="M702,105 L702,260" fill="none"/>
+      </svg>
+
+      {/* Building nodes */}
+      <div style={{position:"absolute",left:"6%",top:"18%"}}><Building site="hq" onClick={()=>onSiteClick("hq")} isActive={activeSite==="hq"}/></div>
+      <div style={{position:"absolute",left:"6%",top:"52%"}}><Building site="b1" onClick={()=>onSiteClick("b1")} isActive={activeSite==="b1"}/></div>
+      <div style={{position:"absolute",left:"42%",top:"62%"}}><Building site="b2" onClick={()=>onSiteClick("b2")} isActive={activeSite==="b2"}/></div>
+      <div style={{position:"absolute",right:"9%",top:"10%"}}><Building site="dc" onClick={()=>onSiteClick("dc")} isActive={activeSite==="dc"}/></div>
+      <div style={{position:"absolute",right:"9%",top:"52%"}}><Building site="dr" onClick={()=>onSiteClick("dr")} isActive={activeSite==="dr"}/></div>
+    </div>
+  );
+}
+
+/* --- Device Node --- */
+function DeviceNode({ device, onClick, isActive, col }) {
+  const I = Icon[device.type] || Icon.desktop;
+  return (
+    <div onClick={onClick} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,cursor:"pointer",width:80}}>
+      <div style={{
+        width:64,height:64,borderRadius:14,
+        background:isActive?`linear-gradient(135deg,${col},${col}cc)`:"#fff",
+        border:`2px solid ${isActive?col:"#e6e9f2"}`,
+        display:"grid",placeItems:"center",
+        boxShadow:isActive?`0 8px 20px ${col}44`:"0 4px 12px rgba(15,21,48,0.06)",
+        transition:"all 0.25s cubic-bezier(.2,.8,.2,1)",
+        position:"relative",
+      }}>
+        <I style={{width:28,height:28,color:isActive?"#fff":"#8b93ab",transition:"color 0.2s"}}/>
+        {isActive&&<div style={{position:"absolute",inset:-5,borderRadius:20,
+          border:`1.5px solid ${col}`,animation:"dPulse 1.2s ease-out infinite",pointerEvents:"none"}}/>}
+      </div>
+      <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:9,fontWeight:700,
+        color:isActive?col:"#8b93ab",letterSpacing:"0.06em",textAlign:"center",
+        transition:"color 0.2s"}}>{device.label}</div>
+    </div>
+  );
+}
+
+/* --- Traffic Flow --- */
+function TrafficFlow({ device, site, onClose }) {
+  const [step, setStep] = useState(-1);
+  const hops = getTrafficHops(site);
+  const s = SITES[site];
+
+  useEffect(() => {
+    setStep(-1);
+    const timers = hops.map((h,i) => setTimeout(()=>setStep(i), h.ms+300));
+    return () => timers.forEach(clearTimeout);
+  }, [device.id]);
+
+  const DI = Icon[device.type]||Icon.desktop;
+
+  return (
+    <div style={{
+      background:"#fff",borderRadius:16,border:"1px solid #e6e9f2",
+      boxShadow:"0 16px 48px rgba(15,21,48,0.1)",padding:22,marginTop:18,
+      animation:"fsu 0.3s ease",
+    }}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:10,
+            background:`linear-gradient(135deg,${s.col},${s.col2})`,
+            display:"grid",placeItems:"center",color:"#fff"}}>
+            <DI style={{width:18,height:18}}/>
+          </div>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#0f1530"}}>{device.label} — Traffic Path</div>
+            <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:10,color:"#8b93ab"}}>
+              {device.ip} · {device.os}
+            </div>
+          </div>
+        </div>
+        <button onClick={onClose} style={{width:28,height:28,borderRadius:8,border:"1px solid #e6e9f2",
+          background:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}>
+          <Icon.close style={{width:14,height:14,color:"#8b93ab"}}/>
+        </button>
+      </div>
+
+      {/* Hop chain */}
+      <div style={{display:"flex",alignItems:"center",overflowX:"auto",paddingBottom:6,gap:0}}>
+        {/* Source device */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,flexShrink:0}}>
+          <div style={{width:52,height:52,borderRadius:13,
+            background:`linear-gradient(135deg,${s.col},${s.col2})`,
+            display:"grid",placeItems:"center",color:"#fff",
+            boxShadow:`0 6px 16px ${s.col}44`}}>
+            <DI style={{width:24,height:24}}/>
+          </div>
+          <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:9,color:s.col,fontWeight:700}}>{device.label}</div>
+        </div>
+
+        {hops.map((hop,i)=>{
+          const HI = Icon[hop.icon]||Icon.server;
+          const on = step >= i;
+          return (
+            <div key={i} style={{display:"flex",alignItems:"center",flexShrink:0}}>
+              {/* Connector line */}
+              <div style={{position:"relative",width:48,height:2,margin:"0 3px",marginBottom:22}}>
+                <div style={{height:2,borderRadius:1,background:on?hop.col:"#e6e9f2",transition:"background 0.4s",width:"100%"}}/>
+                {on && <div style={{
+                  position:"absolute",top:-3,left:0,
+                  width:8,height:8,borderRadius:"50%",
+                  background:hop.col,boxShadow:`0 0 6px ${hop.col}`,
+                  animation:"pkt 1.1s linear infinite",
+                }}/>}
+                <div style={{
+                  position:"absolute",right:-1,top:-5,
+                  borderLeft:`8px solid ${on?hop.col:"#e6e9f2"}`,
+                  borderTop:"6px solid transparent",borderBottom:"6px solid transparent",
+                  transition:"border-color 0.4s",
+                }}/>
               </div>
-              {isA && (
-                <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid rgba(${hexRgb(s.color)},0.18)` }}>
-                  <p style={{ margin:"0 0 7px", fontSize:11, color:"rgba(255,255,255,0.6)", lineHeight:1.6 }}>{s.desc}</p>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4 }}>
-                    {s.detail.map((d, j) => (
-                      <div key={j} style={{ fontSize:9, color:"rgba(255,255,255,0.5)", padding:"4px 7px", borderRadius:5, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.05)", display:"flex", gap:5 }}>
-                        <span style={{ color:s.color, flexShrink:0 }}>▸</span>{d}
-                      </div>
-                    ))}
-                  </div>
+              {/* Hop node */}
+              <div style={{
+                display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0,
+                opacity:on?1:0.25,
+                transform:on?"translateY(0)":"translateY(6px)",
+                transition:"all 0.4s ease",
+              }}>
+                <div style={{
+                  width:52,height:52,borderRadius:13,
+                  background:on?`linear-gradient(135deg,${hop.col},${hop.col}bb)`:"#f4f6fc",
+                  border:`2px solid ${on?hop.col:"#e6e9f2"}`,
+                  display:"grid",placeItems:"center",
+                  color:on?"#fff":"#8b93ab",
+                  boxShadow:on?`0 6px 16px ${hop.col}44`:"none",
+                  transition:"all 0.4s ease",
+                }}>
+                  <HI style={{width:24,height:24}}/>
                 </div>
-              )}
+                <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:8,fontWeight:700,
+                  color:on?hop.col:"#8b93ab",textAlign:"center",maxWidth:70,lineHeight:1.3,
+                  transition:"color 0.3s"}}>{hop.label}</div>
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ display:"flex", gap:7, marginBottom:16 }}>
-        <button onClick={() => setAutoPlay(!autoPlay)} style={{ padding:"5px 12px", borderRadius:5, border:`1px solid ${autoPlay?"#00ff9d":"rgba(255,255,255,0.12)"}`, background: autoPlay?"rgba(0,255,157,0.09)":"rgba(255,255,255,0.04)", color: autoPlay?"#00ff9d":"rgba(255,255,255,0.45)", fontSize:9, cursor:"pointer", fontFamily:"'Share Tech Mono',monospace" }}>{autoPlay?"⏸ PAUSE":"▶ AUTO"}</button>
-        <button onClick={() => { setActiveStep(s=>Math.max(0,s-1)); setAutoPlay(false); }} style={{ padding:"5px 10px", borderRadius:5, border:"1px solid rgba(255,255,255,0.1)", background:"rgba(255,255,255,0.04)", color:"rgba(255,255,255,0.55)", fontSize:9, cursor:"pointer" }}>← PREV</button>
-        <button onClick={() => { setActiveStep(s=>Math.min(VEEAM_STEPS.length-1,s+1)); setAutoPlay(false); }} style={{ padding:"5px 10px", borderRadius:5, border:`1px solid rgba(${hexRgb(step.color)},0.4)`, background:`rgba(${hexRgb(step.color)},0.08)`, color:step.color, fontSize:9, cursor:"pointer" }}>NEXT →</button>
-      </div>
-
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, marginBottom:9 }}>KEY ADVANTAGES</div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:7, marginBottom:16 }}>
-        {VEEAM_ADV.map((a,i) => (
-          <div key={i} style={{ padding:"10px 11px", borderRadius:7, border:"1px solid rgba(0,255,157,0.1)", background:"rgba(0,255,157,0.02)" }}>
-            <div style={{ fontSize:16, marginBottom:4 }}>{a.icon}</div>
-            <div style={{ fontSize:10, fontWeight:700, color:"#00ff9d", marginBottom:3 }}>{a.title}</div>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.45)", lineHeight:1.5 }}>{a.body}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, marginBottom:9 }}>PROTECTED WORKLOADS</div>
-      <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-        {["VMware vSphere","Microsoft Hyper-V","Windows Servers","Linux Servers","Microsoft 365","AWS EC2","Azure VMs","NAS / File Shares","Kubernetes","Oracle DB","SQL Server","Active Directory","Remote Endpoints"].map((w,i) => (
-          <div key={i} style={{ padding:"2px 8px", borderRadius:20, fontSize:8, background:"rgba(0,255,157,0.05)", border:"1px solid rgba(0,255,157,0.16)", color:"rgba(0,255,157,0.8)" }}>{w}</div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── SITE DETAIL PANELS ─────────────────────────────────────────────────────
-function PanelRow({ v, l, color }) {
-  return (
-    <span style={{ display:"inline-block", textAlign:"center", marginRight:14, marginBottom:12 }}>
-      <div style={{ fontSize:18, fontWeight:700, color }}>{v}</div>
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.32)", fontFamily:"'Share Tech Mono',monospace" }}>{l}</div>
-    </span>
-  );
-}
-
-function HQPanel({ onVeeamClick }) {
-  const sec = [
-    { name:"FortiGate NGFW", color:"#ef4444", desc:"HA Pair · Next-Gen Firewall" },
-    { name:"Veeam Agent", color:"#00ff9d", desc:"Endpoint & Server Backup", isVeeam:true },
-    { name:"Ivanti UEM", color:"#f97316", desc:"Unified Endpoint Management" },
-    { name:"SentinelOne EDR", color:"#8b5cf6", desc:"Endpoint Detection & Response" },
-    { name:"Cisco ISE NAC", color:"#06b6d4", desc:"Network Access Control" },
-    { name:"OPSWAT MetaDefender", color:"#eab308", desc:"File & Device Scanning" },
-  ];
-  return (
-    <div style={{ padding:"18px 20px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-        <span style={{ fontSize:26 }}>🏢</span>
-        <div>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#06b6d4", fontFamily:"'Orbitron',sans-serif" }}>HEADQUARTERS</h2>
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.32)", fontFamily:"'Share Tech Mono',monospace" }}>PRIMARY SITE · SD-WAN · 90% UPLINK</div>
-        </div>
-      </div>
-      <PanelRow v="120" l="Workstations" color="#06b6d4" />
-      <PanelRow v="85" l="IP Phones" color="#06b6d4" />
-      <PanelRow v="200+" l="WiFi Clients" color="#06b6d4" />
-      <PanelRow v="40" l="IoT Devices" color="#06b6d4" />
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, margin:"10px 0 9px" }}>SECURITY SOLUTIONS</div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:7 }}>
-        {sec.map((s,i) => (
-          <div key={i} onClick={s.isVeeam?onVeeamClick:undefined} style={{ padding:"9px 11px", borderRadius:7, border:`1px solid rgba(${hexRgb(s.color)},${s.isVeeam?"0.42":"0.16"})`, background:`rgba(${hexRgb(s.color)},${s.isVeeam?"0.07":"0.03"})`, cursor:s.isVeeam?"pointer":"default" }}>
-            <div style={{ fontSize:10, fontWeight:700, color:s.color, marginBottom:2 }}>{s.name}</div>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.38)" }}>{s.desc}</div>
-            {s.isVeeam && <div style={{ fontSize:8, color:s.color, fontFamily:"'Share Tech Mono',monospace", marginTop:4 }}>→ VIEW BACKUP WORKFLOW</div>}
+      {/* Stats row */}
+      <div style={{display:"flex",gap:8,marginTop:14}}>
+        {[
+          {label:"Latency",    val:site==="dc"?"3ms":site==="b1"||site==="b2"?"18ms":"10ms", col:"#5b8def"},
+          {label:"Throughput", val:"847 Mbps", col:"#10b981"},
+          {label:"Packet Loss",val:"0.02%",    col:"#f59e0b"},
+          {label:"Protocol",   val:"TLS 1.3",  col:"#8b5cf6"},
+        ].map((st,i)=>(
+          <div key={i} style={{flex:1,padding:"10px 10px",borderRadius:10,
+            background:"linear-gradient(180deg,#fafbfe,#f4f6fc)",border:"1px solid #e6e9f2",textAlign:"center"}}>
+            <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:16,fontWeight:800,color:st.col}}>{st.val}</div>
+            <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:"0.12em",color:"#8b93ab",marginTop:3,fontWeight:700}}>{st.label}</div>
           </div>
         ))}
       </div>
@@ -511,197 +409,246 @@ function HQPanel({ onVeeamClick }) {
   );
 }
 
-function DCPanel({ onVeeamClick }) {
-  const tools = [
-    { name:"Veeam B&R v12", color:"#00ff9d", cat:"Backup & Recovery", isVeeam:true },
-    { name:"VMware vSphere 8", color:"#8b5cf6", cat:"Virtualization" },
-    { name:"OPSWAT MetaDefender", color:"#06b6d4", cat:"Content Disarm" },
-    { name:"Ivanti EASM", color:"#f97316", cat:"Attack Surface Mgmt" },
-    { name:"SailPoint IGA", color:"#eab308", cat:"Identity Governance" },
-    { name:"Thales HSM", color:"#38bdf8", cat:"Key Management" },
-  ];
+/* --- Topology View (DC/DR) --- */
+function TopoView({ site }) {
+  const layers = site==="dr" ? DR_LAYERS : DC_LAYERS;
+  const s = SITES[site];
   return (
-    <div style={{ padding:"18px 20px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-        <span style={{ fontSize:26 }}>⚡</span>
-        <div>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:"#f97316", fontFamily:"'Orbitron',sans-serif" }}>DATA CENTER</h2>
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.32)", fontFamily:"'Share Tech Mono',monospace" }}>PRIMARY DC · ALL WORKLOADS VEEAM PROTECTED</div>
-        </div>
+    <div>
+      <div style={{fontSize:10,fontFamily:"JetBrains Mono,monospace",letterSpacing:"0.18em",
+        color:"#8b93ab",textTransform:"uppercase",fontWeight:700,marginBottom:14}}>
+        {s.sub} — Internal Architecture
       </div>
-      <PanelRow v="12" l="vSphere Hosts" color="#f97316" />
-      <PanelRow v="32TB" l="NVMe SAN" color="#f97316" />
-      <PanelRow v="200TB" l="Object Storage" color="#f97316" />
-      <PanelRow v="99.999%" l="Uptime SLA" color="#f97316" />
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, margin:"10px 0 9px" }}>SOLUTIONS</div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:7 }}>
-        {tools.map((t,i) => (
-          <div key={i} onClick={t.isVeeam?onVeeamClick:undefined} style={{ padding:"9px 11px", borderRadius:7, border:`1px solid rgba(${hexRgb(t.color)},${t.isVeeam?"0.42":"0.16"})`, background:`rgba(${hexRgb(t.color)},${t.isVeeam?"0.07":"0.03"})`, cursor:t.isVeeam?"pointer":"default" }}>
-            <div style={{ fontSize:10, fontWeight:700, color:t.color, marginBottom:2 }}>{t.name}</div>
-            <div style={{ fontSize:9, color:"rgba(255,255,255,0.38)" }}>{t.cat}</div>
-            {t.isVeeam && <div style={{ fontSize:8, color:t.color, fontFamily:"'Share Tech Mono',monospace", marginTop:4 }}>→ BACKUP WORKFLOW</div>}
-          </div>
+      <div style={{
+        position:"relative",height:340,
+        background:"linear-gradient(180deg,#fafbfe,#f4f6fc)",
+        borderRadius:16,border:"1px solid #e6e9f2",overflow:"hidden",
+      }}>
+        <div style={{position:"absolute",inset:0,
+          backgroundImage:"radial-gradient(circle,rgba(15,21,48,0.055) 1px,transparent 1px)",
+          backgroundSize:"22px 22px",pointerEvents:"none"}}/>
+        <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+          {/* SD-WAN to FWs */}
+          <line x1="50%" y1="9%" x2={site==="dr"?"35%":"28%"} y2="24%" stroke="#e6e9f2" strokeWidth="1.5" strokeDasharray="4,3"/>
+          <line x1="50%" y1="9%" x2={site==="dr"?"50%":"62%"} y2="24%" stroke="#e6e9f2" strokeWidth="1.5" strokeDasharray="4,3"/>
+          {/* FW to Core */}
+          <line x1={site==="dr"?"35%":"28%"} y1="26%" x2="45%" y2="38%" stroke="#e6e9f2" strokeWidth="1.5" strokeDasharray="4,3"/>
+          {site==="dc"&&<line x1="62%" y1="26%" x2="45%" y2="38%" stroke="#e6e9f2" strokeWidth="1.5" strokeDasharray="4,3"/>}
+          {/* Core to servers */}
+          {(site==="dc"?[14,34,55,76]:[22,50,74]).map((x,i)=>(
+            <line key={i} x1="45%" y1="40%" x2={`${x}%`} y2="54%" stroke="#e6e9f2" strokeWidth="1" strokeDasharray="3,3"/>
+          ))}
+          {/* Servers to storage (DC only) */}
+          {site==="dc"&&[22,45,70].map((x,i)=>(
+            <line key={i} x1={`${[14,34,76][i]}%`} y1="58%" x2={`${x}%`} y2="72%" stroke="#e6e9f2" strokeWidth="1" strokeDasharray="3,3"/>
+          ))}
+        </svg>
+
+        {layers.map(node=>{
+          const NI = Icon[node.icon]||Icon.server;
+          return (
+            <div key={node.id} style={{
+              position:"absolute",left:`${node.x}%`,top:`${node.y}%`,
+              transform:"translate(-50%,-50%)",
+              display:"flex",flexDirection:"column",alignItems:"center",gap:4,zIndex:2,
+            }}>
+              <div
+                style={{
+                  width:50,height:50,borderRadius:13,
+                  background:`${node.col}14`,
+                  border:`1.5px solid ${node.col}50`,
+                  display:"grid",placeItems:"center",
+                  boxShadow:`0 4px 12px ${node.col}20`,
+                  transition:"all 0.2s",cursor:"default",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.background=`${node.col}28`;e.currentTarget.style.borderColor=node.col;e.currentTarget.style.transform="scale(1.1)";}}
+                onMouseLeave={e=>{e.currentTarget.style.background=`${node.col}14`;e.currentTarget.style.borderColor=`${node.col}50`;e.currentTarget.style.transform="scale(1)";}}
+              >
+                <NI style={{width:22,height:22,color:node.col}}/>
+                {node.id==="veeam"&&<div style={{
+                  position:"absolute",top:-5,right:-5,width:12,height:12,
+                  borderRadius:"50%",background:"#10b981",border:"2px solid #fff",
+                  animation:"pulse2 2s infinite",
+                }}/>}
+              </div>
+              <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:8,fontWeight:700,
+                color:node.col,textAlign:"center",maxWidth:70,lineHeight:1.3}}>{node.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* --- Site Device Panel --- */
+function SitePanel({ site }) {
+  const [active, setActive] = useState(null);
+  const s = SITES[site];
+  const devices = SITE_DEVICES[site]||[];
+  return (
+    <div>
+      <div style={{fontSize:10,fontFamily:"JetBrains Mono,monospace",letterSpacing:"0.18em",
+        color:"#8b93ab",textTransform:"uppercase",fontWeight:700,marginBottom:14}}>
+        {s.sub} — Click a device to trace its traffic path
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
+        {devices.map(d=>(
+          <DeviceNode key={d.id} device={d} col={s.col}
+            isActive={active?.id===d.id}
+            onClick={()=>setActive(active?.id===d.id?null:d)}/>
         ))}
       </div>
+      {active && <TrafficFlow device={active} site={site} onClose={()=>setActive(null)}/>}
     </div>
   );
 }
 
-function BranchPanel({ siteId, onVeeamClick }) {
-  const s = SITE_DATA[siteId];
-  return (
-    <div style={{ padding:"18px 20px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-        <span style={{ fontSize:26 }}>🏪</span>
-        <div>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:s.color, fontFamily:"'Orbitron',sans-serif" }}>{s.title.toUpperCase()}</h2>
-          <div style={{ fontSize:9, color:"rgba(255,255,255,0.32)", fontFamily:"'Share Tech Mono',monospace" }}>BRANCH OFFICE · SD-WAN · VEEAM PROTECTED</div>
-        </div>
-      </div>
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, marginBottom:8 }}>CORE LAYER</div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:12 }}>
-        {s.coreDevices.map((d,i) => <DeviceChip key={i} label={d} color={s.accentColor} />)}
-      </div>
-      <div style={{ fontSize:8, color:"rgba(255,255,255,0.28)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:3, marginBottom:8 }}>ACCESS LAYER</div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:16 }}>
-        {s.accessDevices.map((d,i) => <DeviceChip key={i} label={d} color={s.color} />)}
-      </div>
-      <div onClick={onVeeamClick} style={{ padding:"11px 13px", borderRadius:8, cursor:"pointer", border:"1px solid rgba(0,255,157,0.32)", background:"rgba(0,255,157,0.05)" }}>
-        <div style={{ fontSize:11, fontWeight:700, color:"#00ff9d", marginBottom:2 }}>🛡️ Veeam Agent</div>
-        <div style={{ fontSize:9, color:"rgba(255,255,255,0.38)" }}>Backup to DC via WAN Accelerator</div>
-        <div style={{ fontSize:8, color:"#00ff9d", fontFamily:"'Share Tech Mono',monospace", marginTop:4 }}>→ VIEW BACKUP WORKFLOW</div>
-      </div>
-    </div>
-  );
-}
+/* --- MAIN APP --- */
+export default function App() {
+  const [site, setSite] = useState(null);
+  const [clock, setClock] = useState(new Date());
+  useEffect(()=>{const id=setInterval(()=>setClock(new Date()),1000);return()=>clearInterval(id);},[]);
 
-// ── SIDE PANEL ─────────────────────────────────────────────────────────────
-function SidePanel({ page, onClose, onVeeamClick, isMobile }) {
-  const content = { hq:<HQPanel onVeeamClick={onVeeamClick}/>, dc:<DCPanel onVeeamClick={onVeeamClick}/>, b1:<BranchPanel siteId="b1" onVeeamClick={onVeeamClick}/>, b2:<BranchPanel siteId="b2" onVeeamClick={onVeeamClick}/>, veeam:<VeeamPage/> };
-  const colors = { hq:"#06b6d4", dc:"#f97316", b1:"#10b981", b2:"#8b5cf6", veeam:"#00ff9d" };
-  const c = colors[page] || "#38bdf8";
+  const s = site?SITES[site]:null;
+  const isTopo = site==="dc"||site==="dr";
+  const isDevs = site==="hq"||site==="b1"||site==="b2";
+
   return (
     <div style={{
-      position:"fixed",
-      ...(isMobile ? { bottom:0, left:0, right:0, top:"38%", borderRadius:"14px 14px 0 0" } : { top:0, bottom:0, right:0, width:"min(600px,50vw)" }),
-      background:"rgba(2,4,14,0.97)", border:`1px solid rgba(${hexRgb(c)},0.18)`,
-      display:"flex", flexDirection:"column", backdropFilter:"blur(20px)",
-      zIndex:200, animation: isMobile ? "slideUp 0.22s ease" : "slideIn 0.22s ease",
+      minHeight:"100vh",
+      background:"radial-gradient(900px 500px at 90% -5%,rgba(139,92,246,.07),transparent 60%),radial-gradient(700px 400px at -5% 10%,rgba(91,141,239,.09),transparent 60%),#f6f7fb",
+      fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif",
+      color:"#0f1530",
     }}>
-      <div style={{ padding:"11px 16px", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:c, fontFamily:"'Share Tech Mono',monospace", letterSpacing:2 }}>
-          {page === "veeam" ? "VEEAM BACKUP & REPLICATION" : page.toUpperCase() + " — DETAIL"}
-        </div>
-        <button onClick={onClose} style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)", color:"rgba(255,255,255,0.55)", borderRadius:5, padding:"3px 9px", cursor:"pointer", fontSize:10 }}>✕</button>
-      </div>
-      <div style={{ flex:1, overflowY:"auto" }}>{content[page]}</div>
-    </div>
-  );
-}
-
-// ── HEADER ─────────────────────────────────────────────────────────────────
-function Header({ clock, isMobile }) {
-  return (
-    <div style={{ position:"fixed", top:0, left:0, right:0, height: isMobile?44:52, zIndex:100, display:"flex", alignItems:"center", justifyContent:"space-between", padding: isMobile?"0 12px":"0 20px", background:"rgba(2,4,14,0.96)", borderBottom:"1px solid rgba(255,255,255,0.06)", backdropFilter:"blur(10px)" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-        <div style={{ width: isMobile?24:28, height: isMobile?24:28, borderRadius:7, border:"1.5px solid #38bdf8", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 0 9px rgba(56,189,248,0.28)" }}>
-          <div style={{ width:7, height:7, background:"#38bdf8", borderRadius:2, animation:"pulse 2s infinite" }} />
-        </div>
-        <div>
-          <div style={{ color:"#38bdf8", fontSize: isMobile?9:11, fontWeight:700, letterSpacing:3, fontFamily:"'Share Tech Mono',monospace" }}>ENTERPRISE NETWORK TOPOLOGY</div>
-          {!isMobile && <div style={{ color:"rgba(56,189,248,0.32)", fontSize:7, letterSpacing:3, fontFamily:"'Share Tech Mono',monospace" }}>INTERACTIVE ARCHITECTURE · VEEAM PROTECTED</div>}
-        </div>
-      </div>
-      <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-          <div style={{ width:5, height:5, borderRadius:"50%", background:"#10b981", animation:"blink 1.5s infinite" }} />
-          {!isMobile && <span style={{ color:"#10b981", fontSize:8, fontFamily:"'Share Tech Mono',monospace" }}>ALL SITES NOMINAL</span>}
-        </div>
-        <span style={{ color:"rgba(255,255,255,0.2)", fontSize:9, fontFamily:"'Share Tech Mono',monospace" }}>{clock.toLocaleTimeString("en-US",{hour12:false})}</span>
-      </div>
-    </div>
-  );
-}
-
-// ── BOTTOM NAV ─────────────────────────────────────────────────────────────
-function BottomNav({ activePage, onNavigate }) {
-  const items = [
-    { id:"hq", icon:"🏢", label:"HQ", color:"#06b6d4" },
-    { id:"dc", icon:"⚡", label:"DC", color:"#f97316" },
-    { id:"b1", icon:"🏪", label:"Branch-1", color:"#10b981" },
-    { id:"b2", icon:"🏪", label:"Branch-2", color:"#8b5cf6" },
-    { id:"veeam", icon:"🛡️", label:"Veeam", color:"#00ff9d" },
-  ];
-  return (
-    <div style={{ position:"fixed", bottom:14, left:"50%", transform:"translateX(-50%)", display:"flex", gap:5, zIndex:300, background:"rgba(2,4,14,0.94)", borderRadius:12, border:"1px solid rgba(255,255,255,0.07)", padding:"5px 8px", backdropFilter:"blur(16px)" }}>
-      {items.map(item => {
-        const isA = activePage === item.id;
-        return (
-          <button key={item.id} onClick={() => onNavigate(item.id === activePage ? null : item.id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:2, padding:"4px 9px", borderRadius:7, cursor:"pointer", border:`1px solid ${isA?item.color:"rgba(255,255,255,0.06)"}`, background: isA?`rgba(${hexRgb(item.color)},0.11)`:"transparent", transition:"all 0.18s" }}>
-            <span style={{ fontSize:13 }}>{item.icon}</span>
-            <span style={{ fontSize:7, color: isA?item.color:"rgba(255,255,255,0.3)", fontFamily:"'Share Tech Mono',monospace", whiteSpace:"nowrap" }}>{item.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── ROOT APP ───────────────────────────────────────────────────────────────
-export default function App() {
-  const [activePage, setActivePage] = useState(null);
-  const [clock, setClock] = useState(new Date());
-  const [winW, setWinW] = useState(window.innerWidth);
-
-  useInterval(() => setClock(new Date()), 1000);
-  useEffect(() => {
-    const u = () => setWinW(window.innerWidth);
-    window.addEventListener("resize", u);
-    return () => window.removeEventListener("resize", u);
-  }, []);
-
-  const isMobile = winW < 640;
-  const headerH = isMobile ? 44 : 52;
-
-  return (
-    <div style={{ width:"100vw", height:"100vh", background:"#02040e", overflow:"hidden", position:"relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700&display=swap');
-        @keyframes blink{0%,100%{opacity:1}50%{opacity:0.1}}
-        @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(0.75);opacity:0.35}}
-        @keyframes pulseRing{0%{transform:scale(1);opacity:0.35}100%{transform:scale(1.09);opacity:0}}
-        @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-        @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
         *{box-sizing:border-box}
-        button{outline:none;font-family:inherit}
-        ::-webkit-scrollbar{width:4px}
-        ::-webkit-scrollbar-track{background:rgba(255,255,255,0.02)}
-        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+        @keyframes dPulse{0%{transform:scale(1);opacity:.5}100%{transform:scale(1.45);opacity:0}}
+        @keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.75);opacity:.4}}
+        @keyframes fsu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        @keyframes pkt{0%{left:0%}100%{left:calc(100% - 8px)}}
       `}</style>
 
-      {/* Grid BG */}
-      <div style={{ position:"absolute", inset:0, pointerEvents:"none", backgroundImage:"linear-gradient(rgba(56,189,248,0.016) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.016) 1px,transparent 1px)", backgroundSize:"38px 38px" }} />
+      <div style={{maxWidth:1120,margin:"0 auto",padding:"32px 24px 60px"}}>
 
-      <Header clock={clock} isMobile={isMobile} />
+        {/* Kicker */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:"#5b8def",boxShadow:"0 0 0 4px rgba(91,141,239,.18)"}}/>
+          <span style={{fontFamily:"JetBrains Mono,monospace",fontSize:11,letterSpacing:"0.22em",color:"#8b93ab",textTransform:"uppercase"}}>
+            Enterprise Network Topology
+          </span>
+          <span style={{marginLeft:"auto",fontFamily:"JetBrains Mono,monospace",fontSize:10,color:"#8b93ab"}}>
+            {clock.toLocaleTimeString("en-US",{hour12:false})} UTC
+          </span>
+        </div>
 
-      {/* Main diagram */}
-      <div style={{ position:"absolute", top:headerH, bottom:0, left:0, right:0 }}>
-        <TopologyDiagram
-          onSiteClick={id => setActivePage(id === activePage ? null : id)}
-          activeSite={activePage}
-        />
+        <h1 style={{fontSize:"clamp(26px,4vw,38px)",fontWeight:800,letterSpacing:"-0.025em",lineHeight:1.05,margin:"0 0 6px"}}>
+          <span style={{background:"linear-gradient(90deg,#5b8def,#8b5cf6 45%,#ec4899)",WebkitBackgroundClip:"text",backgroundClip:"text",color:"transparent"}}>
+            Network Topology
+          </span>{" "}Visualization
+        </h1>
+        <p style={{color:"#4a5578",fontSize:14,maxWidth:640,lineHeight:1.55,marginTop:6,marginBottom:0}}>
+          Click a <b>building</b> to explore internal topology. Click an <b>end-user device</b> to trace how traffic flows through the network.
+        </p>
+
+        {/* Main card */}
+        <div style={{marginTop:22,borderRadius:20,background:"#fff",border:"1px solid #e6e9f2",boxShadow:"0 8px 40px rgba(15,21,48,.06)",overflow:"hidden"}}>
+
+          {/* Topbar */}
+          <div style={{padding:"13px 20px",borderBottom:"1px solid #f0f2f8",display:"flex",alignItems:"center",gap:12,background:"linear-gradient(180deg,rgba(246,247,251,.6),transparent)"}}>
+            <div style={{
+              width:40,height:40,borderRadius:10,
+              background:s?`linear-gradient(135deg,${s.col},${s.col2})`:"linear-gradient(135deg,#5b8def,#6366f1)",
+              display:"grid",placeItems:"center",color:"#fff",transition:"background 0.3s",
+            }}>
+              {s ? (isTopo ? <Icon.server style={{width:19,height:19}}/> : <Icon.desktop style={{width:19,height:19}}/>) : <Icon.sdwan style={{width:19,height:19}}/>}
+            </div>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,letterSpacing:"-0.01em"}}>
+                {site?SITES[site].sub:"Enterprise Network Overview"}
+              </div>
+              <div style={{fontFamily:"JetBrains Mono,monospace",fontSize:10.5,color:"#8b93ab",letterSpacing:"0.1em",textTransform:"uppercase",marginTop:2}}>
+                {site?`${site.toUpperCase()} · ${isTopo?"Internal Topology":"End-User Devices"}`:"HQ · DC · DR · Branch-1 · Branch-2"}
+              </div>
+            </div>
+
+            {site && (
+              <button onClick={()=>setSite(null)} style={{
+                marginLeft:"auto",appearance:"none",border:"1px solid #e6e9f2",background:"#fff",
+                color:"#0f1530",padding:"8px 16px",borderRadius:10,cursor:"pointer",
+                fontFamily:"inherit",fontSize:13,fontWeight:600,
+                display:"flex",alignItems:"center",gap:6,transition:"all .2s",
+              }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#5b8def";e.currentTarget.style.color="#5b8def";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="#e6e9f2";e.currentTarget.style.color="#0f1530";}}>
+                ← Overview
+              </button>
+            )}
+
+            <div style={{
+              marginLeft:site?"8px":"auto",
+              padding:"5px 12px",borderRadius:999,
+              background:"rgba(16,185,129,0.1)",color:"#10b981",
+              fontFamily:"JetBrains Mono,monospace",fontSize:10,fontWeight:800,letterSpacing:"0.1em",
+              display:"flex",alignItems:"center",gap:6,
+            }}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:"#10b981",animation:"pulse2 1.5s infinite"}}/>
+              ALL SITES NOMINAL
+            </div>
+          </div>
+
+          {/* Canvas */}
+          <div style={{padding:28,minHeight:460}}>
+            {!site && (
+              <>
+                <div style={{display:"flex",gap:18,marginBottom:18,flexWrap:"wrap",fontFamily:"JetBrains Mono,monospace",fontSize:10,color:"#8b93ab"}}>
+                  {[
+                    {col:"#5b8def",label:"HQ — Headquarters"},
+                    {col:"#f97316",label:"DC — Data Center"},
+                    {col:"#8b5cf6",label:"DR — Disaster Recovery"},
+                    {col:"#10b981",label:"Branch Offices"},
+                  ].map((l,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{width:9,height:9,borderRadius:3,background:l.col}}/>
+                      {l.label}
+                    </div>
+                  ))}
+                </div>
+                <OverviewMap activeSite={site} onSiteClick={setSite}/>
+              </>
+            )}
+            {isTopo && <TopoView site={site}/>}
+            {isDevs && <SitePanel site={site}/>}
+          </div>
+        </div>
+
+        {/* Quick nav pills */}
+        <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}>
+          {Object.values(SITES).map(sv=>(
+            <button key={sv.id} onClick={()=>setSite(site===sv.id?null:sv.id)} style={{
+              padding:"7px 16px",borderRadius:999,
+              border:`1.5px solid ${site===sv.id?sv.col:"#e6e9f2"}`,
+              background:site===sv.id?`${sv.col}12`:"#fff",
+              color:site===sv.id?sv.col:"#4a5578",
+              fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700,
+              cursor:"pointer",letterSpacing:"0.08em",transition:"all 0.2s",
+              display:"flex",alignItems:"center",gap:6,
+            }}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:sv.col}}/>
+              {sv.label} — {sv.sub}
+            </button>
+          ))}
+        </div>
+
+        <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid #e6e9f2",
+          color:"#8b93ab",fontFamily:"JetBrains Mono,monospace",fontSize:10,
+          letterSpacing:"0.14em",textTransform:"uppercase",
+          display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+          <span>Enterprise Network · SD-WAN · Veeam Protected</span>
+          <span>HQ · DC · DR · B1 · B2</span>
+        </div>
       </div>
-
-      {/* Hint */}
-      <div style={{ position:"fixed", top:headerH+5, left:"50%", transform:"translateX(-50%)", background:"rgba(4,8,20,0.82)", border:"1px solid rgba(255,255,255,0.04)", borderRadius:4, padding:"3px 10px", fontSize:7, color:"rgba(255,255,255,0.22)", fontFamily:"'Share Tech Mono',monospace", letterSpacing:2, pointerEvents:"none", zIndex:50, whiteSpace:"nowrap" }}>
-        CLICK SITE TO EXPLORE · NAV BELOW FOR VEEAM BACKUP DETAILS
-      </div>
-
-      {activePage && (
-        <SidePanel page={activePage} onClose={() => setActivePage(null)} onVeeamClick={() => setActivePage("veeam")} isMobile={isMobile} />
-      )}
-
-      <BottomNav activePage={activePage} onNavigate={setActivePage} />
     </div>
   );
 }
