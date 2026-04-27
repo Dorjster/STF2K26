@@ -30,18 +30,16 @@ const Ic = {
 const SITES = {
   hq:  {id:"hq",  label:"HQ",  sub:"Headquarters",      col:"#38bdf8", col2:"#6366f1", floors:6},
   dc1: {id:"dc1", label:"DC-1",sub:"Primary Data Center",col:"#f97316", col2:"#ef4444", floors:8},
-  dc2: {id:"dc2", label:"DC-2",sub:"Secondary DC",       col:"#fb923c", col2:"#f97316", floors:7},
   dr1: {id:"dr1", label:"DR-1",sub:"Disaster Recovery 1",col:"#a855f7", col2:"#ec4899", floors:5},
-  dr2: {id:"dr2", label:"DR-2",sub:"Disaster Recovery 2",col:"#8b5cf6", col2:"#a855f7", floors:4},
   b1:  {id:"b1",  label:"B1",  sub:"Branch Office 1",   col:"#10b981", col2:"#06b6d4", floors:3},
   b2:  {id:"b2",  label:"B2",  sub:"Branch Office 2",   col:"#10b981", col2:"#06b6d4", floors:3},
 };
 
 const ISPS = [
-  {id:"isp1",label:"ISP-1",name:"MCS Telecom",    col:"#38bdf8", bw:"10G",  health:"good"},
-  {id:"isp2",label:"ISP-2",name:"Mobicom Fiber",  col:"#10b981", bw:"10G",  health:"good"},
-  {id:"isp3",label:"ISP-3",name:"Univision",       col:"#eab308", bw:"1G",   health:"warn"},
-  {id:"isp4",label:"ISP-4",name:"Skytel Backup",  col:"#a855f7", bw:"1G",   health:"good"},
+  {id:"isp1",label:"ISP-1",name:"Mobicom",        col:"#38bdf8", bw:"10G",  health:"good"},
+  {id:"isp2",label:"ISP-2",name:"Unitel Fiber",   col:"#10b981", bw:"10G",  health:"good"},
+  {id:"isp3",label:"ISP-3",name:"Univision",      col:"#eab308", bw:"1G",   health:"warn"},
+  {id:"isp4",label:"ISP-4",name:"Skytel",          col:"#a855f7", bw:"1G",   health:"good"},
 ];
 
 const SITE_DEVICES = {
@@ -86,17 +84,6 @@ const DC_LAYERS = {
     {id:"san1",  label:"SAN Storage",   icon:"storage", col:"#eab308",x:45,y:70},
     {id:"tape1", label:"Tape Library",  icon:"tape",    col:"#6366f1",x:70,y:70},
   ],
-  dc2:[
-    {id:"sdwan2",label:"SD-WAN Edge",   icon:"sdwan",   col:"#fb923c",x:50,y:9},
-    {id:"fw2a",  label:"FW-01 Active",  icon:"firewall",col:"#ef4444",x:30,y:22},
-    {id:"fw2b",  label:"FW-02 Standby", icon:"firewall",col:"#f97316",x:60,y:22},
-    {id:"core2", label:"Core Switch",   icon:"switch",  col:"#10b981",x:45,y:36},
-    {id:"vm2",   label:"VMware Cluster",icon:"vm",      col:"#a855f7",x:18,y:52},
-    {id:"web2",  label:"Web Cluster",   icon:"web",     col:"#38bdf8",x:50,y:52},
-    {id:"stor2", label:"SAN Storage",   icon:"storage", col:"#eab308",x:76,y:52},
-    {id:"veem2", label:"Veeam Replica", icon:"backup",  col:"#10b981",x:38,y:70,badge:true},
-    {id:"san2",  label:"DR Storage",    icon:"storage", col:"#eab308",x:64,y:70},
-  ],
   dr1:[
     {id:"sdwan-dr1",label:"SD-WAN Edge",  icon:"sdwan",   col:"#a855f7",x:50,y:9},
     {id:"fw-dr1a",  label:"FW Cluster",   icon:"firewall",col:"#ef4444",x:35,y:22},
@@ -104,13 +91,6 @@ const DC_LAYERS = {
     {id:"vm-dr1",   label:"VMware DR",    icon:"vm",      col:"#a855f7",x:22,y:52},
     {id:"rep-dr1",  label:"Veeam Replica",icon:"backup",  col:"#10b981",x:50,y:52,badge:true},
     {id:"str-dr1",  label:"DR Storage",   icon:"storage", col:"#eab308",x:74,y:52},
-  ],
-  dr2:[
-    {id:"sdwan-dr2",label:"SD-WAN Edge",  icon:"sdwan",   col:"#8b5cf6",x:50,y:9},
-    {id:"fw-dr2",   label:"FW Cluster",   icon:"firewall",col:"#ef4444",x:35,y:22},
-    {id:"sw-dr2",   label:"Core Switch",  icon:"switch",  col:"#10b981",x:50,y:36},
-    {id:"vm-dr2",   label:"VMware DR2",   icon:"vm",      col:"#8b5cf6",x:25,y:52},
-    {id:"str-dr2",  label:"Cold Storage", icon:"storage", col:"#eab308",x:65,y:52},
   ],
 };
 
@@ -133,6 +113,351 @@ function getHops(site){
     {label:"iNET / Cloud",  icon:"cloud",   col:"#6366f1",ms:660},
   ];
 }
+
+const SITE_SOLUTION_TEMPLATE = [
+  {id:"access", label:"Access Switch", icon:"switch", col:"#10b981", x:38, y:42},
+  {id:"core", label:"Core Switch", icon:"switch", col:"#06b6d4", x:52, y:42},
+  {id:"firewall", label:"Firewall", icon:"firewall", col:"#ef4444", x:65, y:42},
+  {id:"sdwan", label:"SD-WAN Edge", icon:"sdwan", col:"#38bdf8", x:78, y:42},
+  {id:"isp", label:"4×ISP", icon:"isp", col:"#a855f7", x:90, y:24},
+  {id:"inet", label:"iNET Fabric", icon:"cloud", col:"#6366f1", x:90, y:56},
+  {id:"dcfw", label:"DC-1 Firewall", icon:"firewall", col:"#f97316", x:78, y:74},
+  {id:"dccore", label:"DC-1 Core", icon:"switch", col:"#f97316", x:63, y:74},
+  {id:"apps", label:"Apps / AD / Mail", icon:"server", col:"#38bdf8", x:48, y:74},
+  {id:"veeam", label:"Veeam Backup", icon:"backup", col:"#10b981", x:33, y:74, badge:true},
+];
+
+const SITE_LINKS = [
+  ["access","core"],["core","firewall"],["firewall","sdwan"],
+  ["sdwan","isp"],["isp","inet"],["inet","dcfw"],["dcfw","dccore"],["dccore","apps"],["apps","veeam"]
+];
+
+const SITE_TRAFFIC_PATH = ["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"];
+
+function solutionDescription(id,siteLabel){
+  const map={
+    access:`End devices in ${siteLabel} enter the LAN through access switching before moving to core/security layers.`,
+    core:"Core switching aggregates local VLANs and forwards traffic toward firewall and SD-WAN services.",
+    firewall:"The firewall inspects north-south traffic, applies policies, and allows only approved application flows.",
+    sdwan:"SD-WAN chooses the healthiest ISP path and keeps branch/HQ traffic visible across the WAN fabric.",
+    isp:"Four ISP links provide active/backup WAN transport with animated live path indicators.",
+    inet:"The iNET fabric carries traffic between HQ, branches, DC-1, DR-1, and cloud-facing services.",
+    dcfw:"DC-1 firewall protects traffic entering application and server zones.",
+    dccore:"DC-1 core forwards approved traffic to application, AD, mail, web, and backup networks.",
+    apps:"Application, AD, web, and mail servers are the destination services for user traffic.",
+    veeam:"Veeam receives protected workload/backup traffic after application processing.",
+  };
+  return map[id]||"Click a solution or end device to show how traffic moves through this site topology.";
+}
+
+function getSiteDevicePositions(site){
+  const devices=SITE_DEVICES[site]||[];
+  const columns = site === "hq" ? 3 : 2;
+  const startX = site === "hq" ? 10.5 : 12.5;
+  const gapX = site === "hq" ? 8.2 : 10.5;
+  const startY = site === "hq" ? 22 : 26;
+  const gapY = site === "hq" ? 16 : 18;
+  return devices.map((d,i)=>({
+    ...d,
+    x:startX+(i%columns)*gapX,
+    y:startY+Math.floor(i/columns)*gapY,
+    col:SITES[site].col,
+  }));
+}
+
+function mapIntoBand(value,left,width){
+  return left + (value/100)*width;
+}
+
+const SITE_BAND = { left: 7, width: 86 };
+const DC_BAND = { left: 7, width: 86 };
+
+function getSiteSolutionCatalog(site){
+  const siteLabel=SITES[site]?.label||site?.toUpperCase?.()||"SITE";
+  return [
+    {id:"access", title:`${siteLabel} Access Network`, sub:"Endpoints / VLAN access"},
+    {id:"core", title:"Core Switching", sub:"LAN aggregation / routing"},
+    {id:"firewall", title:"Sophos Firewall", sub:"North-south policy control"},
+    {id:"sdwan", title:"SD-WAN Edge", sub:"Path steering / WAN control"},
+    {id:"isp", title:"4× ISP Bundle", sub:"Multi-homed transport"},
+    {id:"inet", title:"iNET Fabric", sub:"Inter-site secure transport"},
+    {id:"dcfw", title:"Imperva / DC Security", sub:"DC entry inspection"},
+    {id:"apps", title:"Apps / AD / Mail", sub:"Business service landing zone"},
+    {id:"veeam", title:"Veeam Backup", sub:"Backup and recovery"},
+  ];
+}
+
+function getDcSolutionCatalog(site){
+  if(site==="dc1") return [
+    {id:"sdwan1", title:"SD-WAN Edge", sub:"WAN/DC ingress"},
+    {id:"fw1a", title:"Sophos Firewall Cluster", sub:"Perimeter security"},
+    {id:"core1", title:"Core Switch L3", sub:"DC aggregation fabric"},
+    {id:"vm1", title:"VMware Cluster", sub:"Compute workloads"},
+    {id:"web1", title:"Imperva / Web Tier", sub:"Application delivery"},
+    {id:"mail1", title:"Mail Services", sub:"Messaging"},
+    {id:"ad1", title:"Active Directory", sub:"Identity services"},
+    {id:"san1", title:"SAN Storage", sub:"Primary data store"},
+    {id:"veeam1", title:"Veeam Backup", sub:"Backup orchestrator"},
+    {id:"tape1", title:"Tape Library", sub:"Archive / retention"},
+  ];
+  return [
+    {id:"sdwan-dr1", title:"SD-WAN Edge", sub:"DR WAN ingress"},
+    {id:"fw-dr1a", title:"Sophos Firewall", sub:"DR perimeter security"},
+    {id:"sw-dr1", title:"DR Core Switch", sub:"DR traffic aggregation"},
+    {id:"vm-dr1", title:"VM Replica Cluster", sub:"Recovered workloads"},
+    {id:"rep-dr1", title:"Replication Services", sub:"Replica / sync engine"},
+    {id:"str-dr1", title:"DR Storage", sub:"Recovery data store"},
+  ];
+}
+
+function SiteTopoNode({node,isActive,onClick}){
+  const I=Ic[node.icon]||Ic.server;
+  return(
+    <button onClick={onClick} className="topo-click-node" style={{
+      position:"absolute",left:`${node.x}%`,top:`${node.y}%`,transform:"translate(-50%,-50%)",
+      display:"flex",flexDirection:"column",alignItems:"center",gap:5,zIndex:4,
+      background:"transparent",border:0,cursor:"pointer",color:node.col,minWidth:88,
+    }}>
+      <div style={{width:58,height:58,borderRadius:16,position:"relative",
+        background:isActive?`linear-gradient(135deg,${node.col}55,${node.col}18)`:"rgba(3,15,34,0.92)",
+        border:`1.5px solid ${isActive?node.col:`${node.col}55`}`,
+        display:"grid",placeItems:"center",
+        boxShadow:isActive?`0 0 30px ${node.col}66, inset 0 0 18px ${node.col}18`:`0 0 12px ${node.col}18`,
+        transition:"all .25s ease"}}>
+        <I style={{width:25,height:25,color:node.col}}/>
+        {node.badge&&<div style={{position:"absolute",top:-5,right:-5,width:13,height:13,borderRadius:"50%",background:"#10b981",border:"2px solid #020b18",boxShadow:"0 0 10px #10b981",animation:"blink 1.4s infinite"}}/>}
+        {isActive&&<div style={{position:"absolute",inset:-6,borderRadius:22,border:`1px solid ${node.col}`,animation:"dPulse 1.4s ease-out infinite",pointerEvents:"none"}}/>}
+      </div>
+      <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,fontWeight:800,letterSpacing:"0.07em",lineHeight:1.25,
+        color:isActive?node.col:"#5ca1c8",textAlign:"center",textShadow:isActive?`0 0 8px ${node.col}`:"none"}}>
+        {node.label}
+      </div>
+    </button>
+  );
+}
+
+function SiteTopologyView({site}){
+  const [selected,setSelected]=useState({type:"solution",id:"sdwan",label:"SD-WAN Edge",icon:"sdwan",col:"#38bdf8"});
+  const s=SITES[site];
+  const solutionNodes=SITE_SOLUTION_TEMPLATE.map(n=>({...n, x: mapIntoBand(n.x, SITE_BAND.left, SITE_BAND.width)}));
+  const deviceNodes=getSiteDevicePositions(site).map(d=>({...d, x: mapIntoBand(d.x, SITE_BAND.left, SITE_BAND.width)}));
+  const nodeById=Object.fromEntries(solutionNodes.map(n=>[n.id,n]));
+  const solutionCatalog=getSiteSolutionCatalog(site);
+  const pathIndex=selected?.type==="solution"?SITE_TRAFFIC_PATH.indexOf(selected.id):SITE_TRAFFIC_PATH.length-1;
+  const activePath=SITE_TRAFFIC_PATH.slice(0,Math.max(pathIndex+1,2));
+  const activeLinks=new Set((selected?.type==="device"?SITE_LINKS:activePath.slice(0,-1).map((id,i)=>[id,activePath[i+1]])).map(([a,b])=>`${a}-${b}`));
+  const SelectedIcon=Ic[selected?.icon]||Ic.activity;
+
+  return(
+    <div style={{animation:"fadeIn .35s ease"}}>
+      <div style={{fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.22em",
+        color:"#2a5a7a",textTransform:"uppercase",fontWeight:700,marginBottom:14,
+        display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <div style={{width:6,height:6,borderRadius:"50%",background:s.col,boxShadow:`0 0 8px ${s.col}`,animation:"blink 1.5s infinite"}}/>
+        {s.sub} · responsive site topology · click any solution or end device
+      </div>
+
+      <div className="topology-overlay-shell site-topology-shell">
+        <div className="overlay-panel overlay-panel-left">
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:800,color:"#c8e8ff",letterSpacing:".04em"}}>Solutions</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase"}}>click to highlight traffic</div>
+            </div>
+            <div style={{padding:"4px 8px",borderRadius:999,border:`1px solid ${s.col}30`,background:`${s.col}10`,fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:s.col}}>{s.label}</div>
+          </div>
+          <div className="solution-list">
+            {solutionCatalog.map(item=>{
+              const node=nodeById[item.id];
+              const active=selected?.id===item.id;
+              const I=Ic[node?.icon]||Ic.server;
+              return (
+                <button key={item.id} className="solution-btn" onClick={()=>setSelected({type:"solution",...node})} style={{borderColor:active?(node?.col||s.col):"#0f2942",background:active?`${node?.col||s.col}12`:"rgba(3,15,34,.78)",boxShadow:active?`0 0 18px ${(node?.col||s.col)}22`:"none"}}>
+                  <div style={{width:34,height:34,borderRadius:10,display:"grid",placeItems:"center",background:active?`${node?.col||s.col}18`:"rgba(2,10,24,.94)",border:`1px solid ${active?(node?.col||s.col):`${node?.col||s.col}35`}`}}>
+                    <I style={{width:16,height:16,color:node?.col||s.col}}/>
+                  </div>
+                  <div style={{textAlign:"left",minWidth:0}}>
+                    <div style={{fontSize:11.5,fontWeight:800,color:active?(node?.col||"#c8e8ff"):"#a8d8f0",letterSpacing:".03em"}}>{item.title}</div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,color:"#2a5a7a",letterSpacing:".08em",textTransform:"uppercase"}}>{item.sub}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="topology-stage topology-stage-wide">
+          <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle,rgba(56,189,248,.08) 1px,transparent 1px)",backgroundSize:"28px 28px",pointerEvents:"none"}}/>
+          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id={`siteGlow-${site}`}><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <radialGradient id={`siteInet-${site}`} cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor="#6366f1" stopOpacity=".18"/><stop offset="100%" stopColor="#6366f1" stopOpacity="0"/></radialGradient>
+            </defs>
+            <circle cx="960" cy="395" r="120" fill={`url(#siteInet-${site})`}/>
+            {SITE_LINKS.map(([a,b],i)=>{
+              const n1=nodeById[a], n2=nodeById[b];
+              const x1=n1.x/100*1280, y1=n1.y/100*720, x2=n2.x/100*1280, y2=n2.y/100*720;
+              const col=n2.col||s.col;
+              const active=activeLinks.has(`${a}-${b}`)||selected?.type==="device";
+              const cx=(x1+x2)/2, cy=(y1+y2)/2-((a==="isp"||b==="isp")?48:0);
+              const d=`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+              return(
+                <g key={`${a}-${b}`}>
+                  <path d={d} fill="none" stroke={col} strokeWidth={active?8:5} opacity={active ? .18 : .06}/>
+                  <path id={`site-path-${site}-${i}`} d={d} fill="none" stroke={col} strokeWidth={active?2.2:1.2}
+                    strokeDasharray="8,5" opacity={active ? .95 : .28} filter={active?`url(#siteGlow-${site})`:"none"}>
+                    <animate attributeName="stroke-dashoffset" from="13" to="0" dur={`${1.1+i*.08}s`} repeatCount="indefinite"/>
+                  </path>
+                  {active&&<>
+                    <circle r="4.8" fill={col} filter={`url(#siteGlow-${site})`}>
+                      <animateMotion dur={`${1.15+i*.08}s`} repeatCount="indefinite"><mpath href={`#site-path-${site}-${i}`}/></animateMotion>
+                    </circle>
+                    <circle r="3" fill={col} opacity=".55">
+                      <animateMotion dur={`${1.15+i*.08}s`} repeatCount="indefinite" begin="-.55s"><mpath href={`#site-path-${site}-${i}`}/></animateMotion>
+                    </circle>
+                  </>}
+                </g>
+              );
+            })}
+            {deviceNodes.map((d,i)=>{
+              const access=nodeById.access;
+              const x1=d.x/100*1280,y1=d.y/100*720,x2=access.x/100*1280,y2=access.y/100*720;
+              const active=selected?.id===d.id;
+              return <g key={d.id}>
+                <path id={`dev-path-${d.id}`} d={`M${x1},${y1} Q${(x1+x2)/2},${Math.min(y1,y2)-20} ${x2},${y2}`} fill="none"/>
+                <use href={`#dev-path-${d.id}`} stroke={s.col} strokeWidth={active?2:1} strokeDasharray="5,4" opacity={active ? .9 : .25}/>
+                {active&&<circle r="3.4" fill={s.col} filter={`url(#siteGlow-${site})`}><animateMotion dur={`${1+i*.08}s`} repeatCount="indefinite"><mpath href={`#dev-path-${d.id}`}/></animateMotion></circle>}
+              </g>
+            })}
+          </svg>
+
+          <div style={{position:"absolute",left:18,top:16,zIndex:5,padding:"7px 12px",borderRadius:9,border:"1px solid #0f3a60",background:"rgba(2,14,32,.84)",fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"#5ca1c8",letterSpacing:".12em"}}>
+            {s.label} LIVE SITE TOPOLOGY
+          </div>
+
+          {deviceNodes.map(d=>{
+            const I=Ic[d.type]||Ic.desktop;
+            const isActive=selected?.id===d.id;
+            return(
+              <button key={d.id} onClick={()=>setSelected({type:"device",...d,label:d.label,icon:d.type,col:s.col})}
+                style={{position:"absolute",left:`${d.x}%`,top:`${d.y}%`,transform:"translate(-50%,-50%)",zIndex:4,
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:4,width:64,cursor:"pointer",background:"transparent",border:0}}>
+                <div style={{width:40,height:40,borderRadius:12,display:"grid",placeItems:"center",background:isActive?`linear-gradient(135deg,${s.col}44,${s.col2}18)`:"rgba(4,14,32,.88)",border:`1.2px solid ${isActive?s.col:`${s.col}35`}`,boxShadow:isActive?`0 0 20px ${s.col}55`:"none",position:"relative"}}>
+                  <I style={{width:19,height:19,color:isActive?s.col:"#3b789b"}}/>
+                  {isActive&&<span style={{position:"absolute",top:3,right:3,width:6,height:6,borderRadius:"50%",background:s.col,boxShadow:`0 0 7px ${s.col}`,animation:"blink 1s infinite"}}/>}
+                </div>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.2,fontWeight:800,color:isActive?s.col:"#3b789b",textAlign:"center",letterSpacing:".05em"}}>{d.label}</span>
+              </button>
+            );
+          })}
+
+          {(() => {
+            const xs = deviceNodes.map(d => d.x);
+            const ys = deviceNodes.map(d => d.y);
+
+            // Change these values if you want more/less space around the devices.
+            const paddingX = 5;
+            const paddingY = 6;
+
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+
+            const left = minX - paddingX;
+            const top = minY - paddingY;
+            const width = maxX - minX + paddingX * 2;
+            const height = maxY - minY + paddingY * 2;
+
+            return (
+              <>
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${left}%`,
+                    top: `${top}%`,
+                    zIndex: 2,
+                    width: `${width}%`,
+                    height: `${height}%`,
+                    borderRadius: 18,
+                    border: `1px solid ${s.col}26`,
+                    background: "rgba(3,15,34,.28)",
+                    boxShadow: `inset 0 0 26px ${s.col}08`,
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${left + 1}%`,
+                    top: `${top + 1.5}%`,
+                    zIndex: 4,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    fontSize: 8.5,
+                    color: s.col,
+                    letterSpacing: ".18em",
+                    fontWeight: 800,
+                    textTransform: "uppercase",
+                    pointerEvents: "none",
+                  }}
+                >
+                  End devices zone
+                </div>
+              </>
+            );
+          })()}
+          {solutionNodes.map(n=><SiteTopoNode key={n.id} node={n} isActive={selected?.id===n.id} onClick={()=>setSelected({type:"solution",...n})}/>) }
+        </div>
+
+        <div className="overlay-panel overlay-panel-right">
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+            <div style={{width:42,height:42,borderRadius:12,display:"grid",placeItems:"center",background:`${(selected?.col||s.col)}18`,border:`1px solid ${(selected?.col||s.col)}66`}}>
+              <SelectedIcon style={{width:20,height:20,color:selected?.col||s.col}}/>
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:"#c8e8ff",letterSpacing:".04em"}}>Traffic Hub</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase"}}>selected path visibility</div>
+            </div>
+          </div>
+
+          <div style={{padding:"12px 0",borderTop:"1px solid #071828",borderBottom:"1px solid #071828"}}>
+            <div style={{fontSize:14,fontWeight:800,color:selected?.col||s.col,marginBottom:4}}>{selected?.label||"Traffic path"}</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase",marginBottom:10}}>
+              {selected?.type==="device"?`${selected.ip} · ${selected.os}`:"Solution traffic visibility"}
+            </div>
+            <p style={{fontSize:11.5,lineHeight:1.6,color:"#7fb6d8"}}>
+              {selected?.type==="device"?`${selected.label} traffic is highlighted from endpoint → access switch → core → firewall → SD-WAN → ISP → iNET → DC-1 services → backup.`:solutionDescription(selected?.id,s.label)}
+            </p>
+          </div>
+
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#7fb6d8",marginBottom:8}}>Highlighted Path</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {(selected?.type==="device"?SITE_TRAFFIC_PATH:SITE_TRAFFIC_PATH.slice(0,Math.max(pathIndex+1,2))).map((id,i)=>{
+                const n=nodeById[id];
+                return <span key={id} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,color:n?.col||s.col,border:`1px solid ${(n?.col||s.col)}35`,borderRadius:999,padding:"4px 7px",background:`${(n?.col||s.col)}0f`}}>{i+1}. {n?.label||id}</span>
+              })}
+            </div>
+          </div>
+
+          <div style={{marginTop:"auto",paddingTop:10,borderTop:"1px solid #071828"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
+              <div style={{padding:"10px 12px",borderRadius:12,border:"1px solid #0f2942",background:"rgba(3,15,34,.7)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",textTransform:"uppercase",letterSpacing:".12em"}}>Mode</div>
+                <div style={{marginTop:4,fontSize:12,color:"#c8e8ff",fontWeight:800}}>{selected?.type==="device"?"Endpoint Flow":"Solution Flow"}</div>
+              </div>
+              <div style={{padding:"10px 12px",borderRadius:12,border:"1px solid #0f2942",background:"rgba(3,15,34,.7)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",textTransform:"uppercase",letterSpacing:".12em"}}>Scope</div>
+                <div style={{marginTop:4,fontSize:12,color:"#c8e8ff",fontWeight:800}}>{s.sub}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ═══════════════════════════════════════════ BUILDING ═══ */
 function Building({site,onClick,isActive,hovered,onHover}){
@@ -264,18 +589,17 @@ function OverviewMap({activeSite,onSiteClick}){
     b1: {x:8,  y:62},
     b2: {x:38, y:75},
     dc1:{x:74, y:22},
-    dc2:{x:88, y:38},
     dr1:{x:74, y:62},
-    dr2:{x:88, y:75},
+
   };
   const INET={x:50,y:46};
 
   const links=[
     {from:"hq", col:"#38bdf8",bw:"10G",  dur:"1.6s",width:2.5},
     {from:"dc1",col:"#f97316",bw:"10G",  dur:"1.4s",width:2.5},
-    {from:"dc2",col:"#fb923c",bw:"10G",  dur:"1.5s",width:2},
+
     {from:"dr1",col:"#a855f7",bw:"1G",   dur:"2s",  width:1.5},
-    {from:"dr2",col:"#8b5cf6",bw:"1G",   dur:"2.2s",width:1.5},
+
     {from:"b1", col:"#10b981",bw:"1G",   dur:"2.1s",width:1.5},
     {from:"b2", col:"#06b6d4",bw:"500M", dur:"2.4s",width:1.2},
   ];
@@ -409,8 +733,8 @@ function OverviewMap({activeSite,onSiteClick}){
           );
         })}
 
-        {/* DC1 ↔ DC2 replication */}
-        {[["dc1","dc2","#f97316"],["dr1","dr2","#8b5cf6"],["dc1","dr1","#a855f7"],["dc2","dr2","#6366f1"]].map(([a,b,col],i)=>{
+        {/* DC-1 ↔ DR-1 replication */}
+        {[["dc1","dr1","#a855f7"]].map(([a,b,col],i)=>{
           const pa=POS[a],pb=POS[b];
           const x1=pa.x/100*1100,y1=pa.y/100*580,x2=pb.x/100*1100,y2=pb.y/100*580;
           return(
@@ -445,69 +769,168 @@ function OverviewMap({activeSite,onSiteClick}){
       <div style={{position:"absolute",left:"4%", top:"53%",zIndex:5}}><Building site="b1" onClick={()=>onSiteClick("b1")} isActive={activeSite==="b1"} hovered={hov==="b1"} onHover={setHov}/></div>
       <div style={{position:"absolute",left:"34%",top:"65%",zIndex:5}}><Building site="b2" onClick={()=>onSiteClick("b2")} isActive={activeSite==="b2"} hovered={hov==="b2"} onHover={setHov}/></div>
       <div style={{position:"absolute",right:"18%",top:"10%",zIndex:5}}><Building site="dc1" onClick={()=>onSiteClick("dc1")} isActive={activeSite==="dc1"} hovered={hov==="dc1"} onHover={setHov}/></div>
-      <div style={{position:"absolute",right:"4%", top:"26%",zIndex:5}}><Building site="dc2" onClick={()=>onSiteClick("dc2")} isActive={activeSite==="dc2"} hovered={hov==="dc2"} onHover={setHov}/></div>
       <div style={{position:"absolute",right:"18%",top:"54%",zIndex:5}}><Building site="dr1" onClick={()=>onSiteClick("dr1")} isActive={activeSite==="dr1"} hovered={hov==="dr1"} onHover={setHov}/></div>
-      <div style={{position:"absolute",right:"4%", top:"66%",zIndex:5}}><Building site="dr2" onClick={()=>onSiteClick("dr2")} isActive={activeSite==="dr2"} hovered={hov==="dr2"} onHover={setHov}/></div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════ TOPOLOGY VIEW ═══ */
 function TopoView({site}){
-  const nodes=DC_LAYERS[site]||[];
+  const nodes=(DC_LAYERS[site]||[]).map(n=>({...n,x:mapIntoBand(n.x, DC_BAND.left, DC_BAND.width)}));
   const s=SITES[site];
+  const [selected,setSelected]=useState(nodes[0]||null);
   if(!nodes.length) return null;
+
+  const dcLinks = site==="dc1"
+    ? [
+        ["sdwan1","fw1a"],["sdwan1","fw1b"],["fw1a","core1"],["fw1b","core1"],
+        ["core1","vm1"],["core1","mail1"],["core1","web1"],["core1","ad1"],
+        ["vm1","veeam1"],["vm1","san1"],["veeam1","tape1"],["san1","tape1"]
+      ]
+    : [
+        ["sdwan-dr1","fw-dr1a"],["fw-dr1a","sw-dr1"],["sw-dr1","vm-dr1"],
+        ["sw-dr1","rep-dr1"],["sw-dr1","str-dr1"],["vm-dr1","rep-dr1"],["rep-dr1","str-dr1"]
+      ];
+
+  const pathMap = site==="dc1" ? {
+    sdwan1:["sdwan1"], fw1a:["sdwan1","fw1a"], fw1b:["sdwan1","fw1b"], core1:["sdwan1","fw1a","core1"],
+    vm1:["sdwan1","fw1a","core1","vm1"], mail1:["sdwan1","fw1a","core1","mail1"], web1:["sdwan1","fw1a","core1","web1"], ad1:["sdwan1","fw1a","core1","ad1"],
+    veeam1:["sdwan1","fw1a","core1","vm1","veeam1"], san1:["sdwan1","fw1a","core1","vm1","san1"], tape1:["sdwan1","fw1a","core1","vm1","veeam1","tape1"],
+  } : {
+    "sdwan-dr1":["sdwan-dr1"], "fw-dr1a":["sdwan-dr1","fw-dr1a"], "sw-dr1":["sdwan-dr1","fw-dr1a","sw-dr1"],
+    "vm-dr1":["sdwan-dr1","fw-dr1a","sw-dr1","vm-dr1"], "rep-dr1":["sdwan-dr1","fw-dr1a","sw-dr1","rep-dr1"], "str-dr1":["sdwan-dr1","fw-dr1a","sw-dr1","rep-dr1","str-dr1"],
+  };
+
+  const nodeById=Object.fromEntries(nodes.map(n=>[n.id,n]));
+  const activePath=pathMap[selected?.id]||[nodes[0]?.id].filter(Boolean);
+  const activeLinks=new Set(activePath.slice(0,-1).map((id,i)=>`${id}-${activePath[i+1]}`));
+  const SelectedIcon=Ic[selected?.icon]||Ic.activity;
+  const solutionCatalog=getDcSolutionCatalog(site);
+
   return(
-    <div style={{animation:"fadeIn 0.4s ease"}}>
+    <div style={{animation:"fadeIn .35s ease"}}>
       <div style={{fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.22em",
         color:"#2a5a7a",textTransform:"uppercase",fontWeight:700,marginBottom:14,
-        display:"flex",alignItems:"center",gap:8}}>
-        <div style={{width:6,height:6,borderRadius:"50%",background:s.col,
-          boxShadow:`0 0 8px ${s.col}`,animation:"blink 1.5s infinite"}}/>
-        {s.sub} · Internal Architecture
+        display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <div style={{width:6,height:6,borderRadius:"50%",background:s.col,boxShadow:`0 0 8px ${s.col}`,animation:"blink 1.5s infinite"}}/>
+        {s.sub} · responsive topology · click any solution to show traffic
       </div>
-      <div style={{position:"relative",height:340,borderRadius:14,overflow:"hidden",
-        background:"linear-gradient(180deg,rgba(2,10,24,0.95),rgba(2,14,32,0.98))",
-        border:"1px solid #0a2a4a"}}>
-        <div style={{position:"absolute",inset:0,
-          backgroundImage:"radial-gradient(circle,rgba(56,189,248,0.06) 1px,transparent 1px)",
-          backgroundSize:"22px 22px",pointerEvents:"none"}}/>
-        <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
-          <line x1="50%" y1="9%" x2="28%" y2="23%" stroke="#0a2a4a" strokeWidth="1.5" strokeDasharray="4,3"/>
-          <line x1="50%" y1="9%" x2="62%" y2="23%" stroke="#0a2a4a" strokeWidth="1.5" strokeDasharray="4,3"/>
-          <line x1="28%" y1="26%" x2="45%" y2="38%" stroke="#061428" strokeWidth="1.5" strokeDasharray="4,3"/>
-          <line x1="62%" y1="26%" x2="45%" y2="38%" stroke="#061428" strokeWidth="1.5" strokeDasharray="4,3"/>
-          {[14,34,55,76].map((x,i)=><line key={i} x1="45%" y1="40%" x2={`${x}%`} y2="54%" stroke="#061428" strokeWidth="1" strokeDasharray="3,4"/>)}
-          {[22,45,70].map((x,i)=><line key={i} x1={`${[14,34,76][i]||45}%`} y1="58%" x2={`${x}%`} y2="72%" stroke="#041020" strokeWidth="1" strokeDasharray="3,4"/>)}
-        </svg>
-        {nodes.map(node=>{
-          const NI=Ic[node.icon]||Ic.server;
-          return(
-            <div key={node.id} style={{position:"absolute",left:`${node.x}%`,top:`${node.y}%`,
-              transform:"translate(-50%,-50%)",
-              display:"flex",flexDirection:"column",alignItems:"center",gap:4,zIndex:2}}>
-              <div style={{width:52,height:52,borderRadius:13,
-                background:`linear-gradient(135deg,${node.col}20,${node.col}08)`,
-                border:`1.5px solid ${node.col}44`,
-                display:"grid",placeItems:"center",position:"relative",
-                boxShadow:`0 0 14px ${node.col}20`,transition:"all 0.2s",cursor:"default"}}
-                onMouseEnter={e=>{e.currentTarget.style.background=`linear-gradient(135deg,${node.col}44,${node.col}18)`;e.currentTarget.style.borderColor=node.col;e.currentTarget.style.boxShadow=`0 0 28px ${node.col}66`;e.currentTarget.style.transform="scale(1.14)";}}
-                onMouseLeave={e=>{e.currentTarget.style.background=`linear-gradient(135deg,${node.col}20,${node.col}08)`;e.currentTarget.style.borderColor=`${node.col}44`;e.currentTarget.style.boxShadow=`0 0 14px ${node.col}20`;e.currentTarget.style.transform="scale(1)";}}>
-                <NI style={{width:22,height:22,color:node.col}}/>
-                {node.badge&&<div style={{position:"absolute",top:-5,right:-5,width:12,height:12,
-                  borderRadius:"50%",background:"#10b981",border:"2px solid #020b18",
-                  boxShadow:"0 0 8px #10b981",animation:"blink 1.5s infinite"}}/>}
-              </div>
-              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,fontWeight:700,
-                color:node.col,textAlign:"center",maxWidth:74,lineHeight:1.3,
-                letterSpacing:"0.06em",textShadow:`0 0 6px ${node.col}55`}}>{node.label}</div>
+
+      <div className="topology-overlay-shell">
+        <div className="overlay-panel overlay-panel-left">
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#c8e8ff",letterSpacing:".04em"}}>Solutions</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase"}}>dc / dr services list</div>
+          </div>
+          <div className="solution-list">
+            {solutionCatalog.map(item=>{
+              const node=nodeById[item.id] || nodeById.fw1a;
+              const active=selected?.id===item.id;
+              const I=Ic[node?.icon]||Ic.server;
+              return (
+                <button key={item.id} className="solution-btn" onClick={()=>node && setSelected(node)} style={{borderColor:active?(node?.col||s.col):"#0f2942",background:active?`${node?.col||s.col}12`:"rgba(3,15,34,.78)",boxShadow:active?`0 0 18px ${(node?.col||s.col)}22`:"none"}}>
+                  <div style={{width:34,height:34,borderRadius:10,display:"grid",placeItems:"center",background:active?`${node?.col||s.col}18`:"rgba(2,10,24,.94)",border:`1px solid ${active?(node?.col||s.col):`${node?.col||s.col}35`}`}}>
+                    <I style={{width:16,height:16,color:node?.col||s.col}}/>
+                  </div>
+                  <div style={{textAlign:"left",minWidth:0}}>
+                    <div style={{fontSize:11.5,fontWeight:800,color:active?(node?.col||"#c8e8ff"):"#a8d8f0",letterSpacing:".03em"}}>{item.title}</div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,color:"#2a5a7a",letterSpacing:".08em",textTransform:"uppercase"}}>{item.sub}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="topology-stage topology-stage-wide">
+          <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle,rgba(56,189,248,.08) 1px,transparent 1px)",backgroundSize:"28px 28px",pointerEvents:"none"}}/>
+          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}} viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id={`dcGlow-${site}`}><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <radialGradient id={`dcCore-${site}`} cx="50%" cy="50%" r="50%"><stop offset="0%" stopColor={s.col} stopOpacity=".17"/><stop offset="100%" stopColor={s.col} stopOpacity="0"/></radialGradient>
+            </defs>
+            <circle cx="640" cy="390" r="185" fill={`url(#dcCore-${site})`}/>
+            {dcLinks.map(([a,b],i)=>{
+              const n1=nodeById[a],n2=nodeById[b];
+              if(!n1||!n2) return null;
+              const x1=n1.x/100*1280,y1=n1.y/100*720,x2=n2.x/100*1280,y2=n2.y/100*720;
+              const col=n2.col||s.col;
+              const active=activeLinks.has(`${a}-${b}`);
+              const cx=(x1+x2)/2,cy=(y1+y2)/2-20;
+              const d=`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+              return(
+                <g key={`${a}-${b}`}>
+                  <path d={d} fill="none" stroke={col} strokeWidth={active?8:5} opacity={active ? .18 : .06}/>
+                  <path id={`dc-path-${site}-${i}`} d={d} fill="none" stroke={col} strokeWidth={active?2.2:1.2}
+                    strokeDasharray="8,5" opacity={active ? .95 : .30} filter={active?`url(#dcGlow-${site})`:"none"}>
+                    <animate attributeName="stroke-dashoffset" from="13" to="0" dur={`${1.05+i*.08}s`} repeatCount="indefinite"/>
+                  </path>
+                  {active&&<>
+                    <circle r="4.8" fill={col} filter={`url(#dcGlow-${site})`}>
+                      <animateMotion dur={`${1.05+i*.08}s`} repeatCount="indefinite"><mpath href={`#dc-path-${site}-${i}`}/></animateMotion>
+                    </circle>
+                    <circle r="3" fill={col} opacity=".55">
+                      <animateMotion dur={`${1.05+i*.08}s`} repeatCount="indefinite" begin="-.5s"><mpath href={`#dc-path-${site}-${i}`}/></animateMotion>
+                    </circle>
+                  </>}
+                </g>
+              );
+            })}
+          </svg>
+
+          <div style={{position:"absolute",left:18,top:16,zIndex:5,padding:"7px 12px",borderRadius:9,border:"1px solid #0f3a60",background:"rgba(2,14,32,.84)",fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"#5ca1c8",letterSpacing:".12em"}}>
+            {s.label} LIVE TOPOLOGY
+          </div>
+
+          {nodes.map(n=><SiteTopoNode key={n.id} node={n} isActive={selected?.id===n.id} onClick={()=>setSelected(n)}/>)}
+        </div>
+
+        <div className="overlay-panel overlay-panel-right">
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+            <div style={{width:42,height:42,borderRadius:12,display:"grid",placeItems:"center",background:`${(selected?.col||s.col)}18`,border:`1px solid ${(selected?.col||s.col)}66`}}>
+              <SelectedIcon style={{width:20,height:20,color:selected?.col||s.col}}/>
             </div>
-          );
-        })}
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:"#c8e8ff",letterSpacing:".04em"}}>Traffic Hub</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase"}}>selected service path</div>
+            </div>
+          </div>
+          <div style={{padding:"12px 0",borderTop:"1px solid #071828",borderBottom:"1px solid #071828"}}>
+            <div style={{fontSize:14,fontWeight:800,color:selected?.col||s.col,marginBottom:4}}>{selected?.label||"Traffic path"}</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",letterSpacing:".12em",textTransform:"uppercase",marginBottom:10}}>Clickable DC/DR solution traffic visibility</div>
+            <p style={{fontSize:11.5,lineHeight:1.6,color:"#7fb6d8"}}>
+              {site==="dc1"
+                ? `${selected?.label||"Selected node"} traffic is shown through the primary DC path from SD-WAN/firewall to core, applications, storage, and backup services.`
+                : `${selected?.label||"Selected node"} traffic is shown through the DR path from SD-WAN/firewall to DR core, replica workloads, and DR storage.`}
+            </p>
+          </div>
+          <div>
+            <div style={{fontSize:10,fontWeight:700,color:"#7fb6d8",marginBottom:8}}>Highlighted Path</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {activePath.map((id,i)=>{
+                const n=nodeById[id];
+                return <span key={id} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,color:n?.col||s.col,border:`1px solid ${(n?.col||s.col)}35`,borderRadius:999,padding:"4px 7px",background:`${(n?.col||s.col)}0f`}}>{i+1}. {n?.label||id}</span>
+              })}
+            </div>
+          </div>
+          <div style={{marginTop:"auto",paddingTop:10,borderTop:"1px solid #071828"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
+              <div style={{padding:"10px 12px",borderRadius:12,border:"1px solid #0f2942",background:"rgba(3,15,34,.7)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",textTransform:"uppercase",letterSpacing:".12em"}}>Zone</div>
+                <div style={{marginTop:4,fontSize:12,color:"#c8e8ff",fontWeight:800}}>{site==="dc1"?"Primary DC":"Recovery DC"}</div>
+              </div>
+              <div style={{padding:"10px 12px",borderRadius:12,border:"1px solid #0f2942",background:"rgba(3,15,34,.7)"}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#2a5a7a",textTransform:"uppercase",letterSpacing:".12em"}}>Scope</div>
+                <div style={{marginTop:4,fontSize:12,color:"#c8e8ff",fontWeight:800}}>{s.label}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
 
 /* ═══════════════════════════════════════════ DEVICE NODE ═══ */
 function DeviceNode({device,onClick,isActive,col}){
@@ -622,7 +1045,7 @@ function TrafficFlow({device,site,onClose}){
       </div>
       <div style={{display:"flex",gap:8,marginTop:18}}>
         {[
-          {label:"LATENCY",    val:site==="dc1"||site==="dc2"?"3ms":"18ms", col:"#38bdf8"},
+          {label:"LATENCY",    val:site==="dc1", col:"#38bdf8"},
           {label:"THROUGHPUT", val:"847 Mbps",   col:"#10b981"},
           {label:"PKT LOSS",   val:"0.02%",      col:"#f97316"},
           {label:"PROTOCOL",   val:"TLS 1.3",    col:"#a855f7"},
@@ -682,15 +1105,15 @@ export default function App(){
   },[]);
 
   const s=site?SITES[site]:null;
-  const isTopo=site&&["dc1","dc2","dr1","dr2"].includes(site);
+  const isTopo=site&&["dc1","dr1"].includes(site);
   const isDevs=site&&["hq","b1","b2"].includes(site);
 
   const navItems=[
     {id:"hq", label:"HQ"},
     {id:"dc1",label:"DC-1"},
-    {id:"dc2",label:"DC-2"},
+
     {id:"dr1",label:"DR-1"},
-    {id:"dr2",label:"DR-2"},
+
     {id:"b1", label:"B1"},
     {id:"b2", label:"B2"},
   ];
@@ -702,9 +1125,21 @@ export default function App(){
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         html,body,#root{width:100%;min-height:100vh;background:#020b18}
-        ::-webkit-scrollbar{width:4px;height:4px}
-        ::-webkit-scrollbar-track{background:#020b18}
-        ::-webkit-scrollbar-thumb{background:#0f3a60;border-radius:2px}
+        .topology-overlay-shell{position:relative;display:grid;grid-template-columns:minmax(180px,210px) minmax(0,1fr) minmax(205px,240px);gap:10px;align-items:stretch;min-height:clamp(500px,56vh,700px);width:100%;padding:10px;border:1px solid #071d33;border-radius:20px;background:linear-gradient(180deg,rgba(2,10,24,.72),rgba(2,14,32,.92));overflow:hidden}
+        .site-topology-shell{grid-template-columns:minmax(210px,245px) minmax(0,1fr) minmax(175px,205px);height:clamp(560px,calc(100vh - 270px),760px);min-height:clamp(560px,calc(100vh - 270px),760px)}
+        .site-topology-shell .topology-stage-wide{min-height:100%;height:100%}
+        .topology-stage{position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(180deg,rgba(2,10,24,.98),rgba(2,14,32,.99))}
+        .topology-stage-wide{width:100%;height:100%;min-height:clamp(450px,50vh,640px);border:1px solid #0a2a4a;box-shadow:inset 0 0 40px rgba(56,189,248,.035)}
+        .overlay-panel{position:relative;z-index:7;min-width:0;border-radius:16px;border:1px solid #0a2a4a;background:rgba(2,10,24,.92);padding:12px;display:flex;flex-direction:column;gap:10px;backdrop-filter:blur(6px);overflow:hidden}
+        .overlay-panel-left,.overlay-panel-right{width:100%}
+        .overview-map-shell{max-width:1320px;margin:0 auto;padding:0 10px}
+        .solution-list{display:flex;flex-direction:column;gap:8px;min-height:0}
+        .solution-btn{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;border:1px solid #0f2942;cursor:pointer;transition:all .2s;background:rgba(3,15,34,.78);min-width:0}
+        .solution-btn:hover{transform:translateY(-1px);border-color:#1b4b72}
+        @media(max-width:1320px){.topology-overlay-shell{grid-template-columns:minmax(165px,190px) minmax(0,1fr) minmax(190px,220px);gap:10px;padding:10px}.site-topology-shell{grid-template-columns:minmax(195px,225px) minmax(0,1fr) minmax(165px,190px);height:clamp(540px,calc(100vh - 250px),720px);min-height:clamp(540px,calc(100vh - 250px),720px)}.overlay-panel{padding:10px}.solution-btn{padding:8px 9px;gap:8px}}
+        @media(max-width:1160px){.topology-overlay-shell,.site-topology-shell{grid-template-columns:1fr 1fr;grid-template-areas:"stage stage" "left right";min-height:auto;height:auto}.topology-stage-wide{grid-area:stage;min-height:clamp(400px,50vw,560px);height:auto;aspect-ratio:16/9}.overlay-panel-left{grid-area:left}.overlay-panel-right{grid-area:right}.overlay-panel{min-height:240px}.solution-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:760px){.topology-overlay-shell,.site-topology-shell{grid-template-columns:1fr;grid-template-areas:"stage" "left" "right";padding:8px;height:auto;min-height:auto}.topology-stage-wide{min-height:340px}.overlay-panel{min-height:auto}.solution-list{grid-template-columns:1fr}.overview-map-shell{padding:0 8px}}
+        @media(max-width:980px){.overview-map-shell{padding:0 8px}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
         @keyframes dPulse{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.6);opacity:0}}
         @keyframes fsu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -717,7 +1152,7 @@ export default function App(){
       {/* ── HEADER ── */}
       <div style={{borderBottom:"1px solid #071828",background:"rgba(2,11,24,0.98)",
         backdropFilter:"blur(20px)",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1400,margin:"0 auto",padding:"0 24px",
+        <div style={{maxWidth:1560,margin:"0 auto",padding:"0 16px",
           display:"flex",alignItems:"center",height:56,gap:20}}>
 
           {/* Logo */}
@@ -729,12 +1164,12 @@ export default function App(){
               <Ic.activity style={{width:18,height:18,color:"#38bdf8"}}/>
             </div>
             <div>
-              <div style={{fontFamily:"Orbitron,monospace",fontSize:12,fontWeight:900,
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:13,fontWeight:900,
                 color:"#38bdf8",letterSpacing:"0.18em",
-                textShadow:"0 0 12px #38bdf8"}}>NETOPS</div>
+                textShadow:"0 0 12px #38bdf8"}}>ITZONE</div>
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,
                 color:"#1a4a6a",letterSpacing:"0.25em",textTransform:"uppercase",marginTop:1}}>
-                TOPOLOGY DASHBOARD
+                ENTERPRISE TOPOLOGY
               </div>
             </div>
           </div>
@@ -742,10 +1177,10 @@ export default function App(){
           {/* Status bar */}
           <div style={{display:"flex",gap:14,marginLeft:20}}>
             {[
-              {label:"SITES",val:"7",   col:"#38bdf8"},
+              {label:"SITES",val:"5",   col:"#38bdf8"},
               {label:"ISPs", val:"4",   col:"#a855f7"},
-              {label:"DCs",  val:"2",   col:"#f97316"},
-              {label:"DRs",  val:"2",   col:"#8b5cf6"},
+              {label:"DCs",  val:"1",   col:"#f97316"},
+              {label:"DRs",  val:"1",   col:"#8b5cf6"},
               {label:"UPTIME",val:"99.99%",col:"#10b981"},
             ].map((st,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:6,
@@ -777,8 +1212,8 @@ export default function App(){
 
         {/* ISP status strip */}
         <div style={{borderTop:"1px solid #071828",background:"rgba(2,8,18,0.6)",
-          padding:"6px 24px",display:"flex",alignItems:"center",gap:20,
-          maxWidth:1400,margin:"0 auto",flexWrap:"wrap"}}>
+          padding:"6px 16px",display:"flex",alignItems:"center",gap:20,
+          maxWidth:1560,margin:"0 auto",flexWrap:"wrap"}}>
           <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:8,color:"#1a4a6a",
             letterSpacing:"0.2em",textTransform:"uppercase",flexShrink:0}}>ISP LINKS:</span>
           {ISPS.map(isp=>(
@@ -798,15 +1233,15 @@ export default function App(){
       </div>
 
       {/* ── MAIN ── */}
-      <div style={{maxWidth:1400,margin:"0 auto",padding:"24px 24px 60px"}}>
+      <div style={{maxWidth:1560,margin:"0 auto",padding:"18px 12px 40px"}}>
 
         {/* Title */}
         <div style={{marginBottom:20,display:"flex",alignItems:"flex-end",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-          <div>
+         <div>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,letterSpacing:"0.28em",
               color:"#1a4a6a",textTransform:"uppercase",marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:20,height:1,background:"linear-gradient(90deg,transparent,#1a4a6a)"}}/>
-              Enterprise Network Operations Center
+            
               <div style={{width:20,height:1,background:"linear-gradient(90deg,#1a4a6a,transparent)"}}/>
             </div>
             <h1 style={{fontFamily:"Orbitron,monospace",fontSize:"clamp(22px,3.5vw,36px)",
@@ -814,7 +1249,7 @@ export default function App(){
               background:"linear-gradient(90deg,#38bdf8,#6366f1 40%,#a855f7)",
               WebkitBackgroundClip:"text",backgroundClip:"text",color:"transparent",
               textShadow:"none"}}>
-              NETWORK TOPOLOGY
+            
             </h1>
           </div>
           {site&&(
@@ -864,8 +1299,8 @@ export default function App(){
               <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"#1a4a6a",
                 letterSpacing:"0.16em",textTransform:"uppercase",marginTop:2}}>
                 {site
-                  ?`${site.toUpperCase()} · ${isTopo?"Internal Topology":"End-User Devices & Traffic"}`
-                  :"HQ · DC-1 · DC-2 · DR-1 · DR-2 · Branch-1 · Branch-2 · 4×ISP SD-WAN"}
+                  ?`${site.toUpperCase()} · ${isTopo?"Internal Topology":"Site Topology & Live Traffic"}`
+                  :"HQ · DC-1 · DR-1 · Branch-1 · Branch-2 · 4×ISP SD-WAN"}
               </div>
             </div>
             {/* Scanning indicator */}
@@ -882,7 +1317,7 @@ export default function App(){
           </div>
 
           {/* Canvas */}
-          <div style={{padding:site?24:16,minHeight:500}}>
+          <div style={{padding:site?12:14,minHeight:site?0:620}}>
             {!site&&(
               <>
                 {/* Legend */}
@@ -894,8 +1329,8 @@ export default function App(){
                   <span style={{letterSpacing:"0.18em",textTransform:"uppercase",color:"#0f3a60",marginRight:4}}>LEGEND:</span>
                   {[
                     {col:"#38bdf8",label:"HQ — Headquarters"},
-                    {col:"#f97316",label:"DC-1/2 — Data Centers"},
-                    {col:"#a855f7",label:"DR-1/2 — Disaster Recovery"},
+                    {col:"#f97316",label:"DC-1 — Data Center"},
+                    {col:"#a855f7",label:"DR-1 — Disaster Recovery"},
                     {col:"#10b981",label:"Branch Offices"},
                     {col:"#a855f7",label:"4×ISP Multi-Homed SD-WAN"},
                   ].map((l,i)=>(
@@ -910,11 +1345,11 @@ export default function App(){
                     <span>Hover buildings for glow · Click to drill-in</span>
                   </div>
                 </div>
-                <OverviewMap activeSite={site} onSiteClick={setSite}/>
+                <div className="overview-map-shell"><OverviewMap activeSite={site} onSiteClick={setSite}/></div>
               </>
             )}
             {isTopo&&<TopoView site={site}/>}
-            {isDevs&&<SitePanel site={site}/>}
+            {isDevs&&<SiteTopologyView site={site}/>}
           </div>
         </div>
 
@@ -950,7 +1385,7 @@ export default function App(){
           fontFamily:"'JetBrains Mono',monospace",fontSize:8.5,color:"#0f3a60",
           letterSpacing:"0.16em",textTransform:"uppercase"}}>
           <span>Enterprise Network Ops · SD-WAN · 4×ISP · Veeam Protected</span>
-          <span>2×DC · 2×DR · HQ · 2×Branch · © 2026</span>
+          <span>1×DC · 1×DR · HQ · 2×Branch · © 2026</span>
         </div>
       </div>
     </div>
