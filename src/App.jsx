@@ -94,22 +94,28 @@ const DC_LAYERS = {
   ],
 };
 
+function getSiteIspCount(site){
+  return site === "hq" ? 4 : 2;
+}
+
 function getHops(site){
+  const ispLabel=`${getSiteIspCount(site)}×ISP`;
   if(site==="b1"||site==="b2") return [
     {label:"Access Switch", icon:"switch",  col:"#10b981",ms:0},
     {label:"Core Switch",   icon:"switch",  col:"#06b6d4",ms:130},
-    {label:"SD-WAN Edge",   icon:"sdwan",   col:"#38bdf8",ms:270},
-    {label:"ISP x4",        icon:"isp",     col:"#a855f7",ms:400},
-    {label:"iNET Fabric",   icon:"cloud",   col:"#6366f1",ms:540},
-    {label:"DC-1 Firewall", icon:"firewall",col:"#ef4444",ms:680},
-    {label:"DC-1 Core",     icon:"switch",  col:"#f97316",ms:800},
+    {label:"Firewall",      icon:"firewall",col:"#ef4444",ms:260},
+    {label:"SD-WAN Edge",   icon:"sdwan",   col:"#38bdf8",ms:390},
+    {label:ispLabel,         icon:"isp",     col:"#a855f7",ms:520},
+    {label:"iNET Fabric",   icon:"cloud",   col:"#6366f1",ms:650},
+    {label:"DC-1 Firewall", icon:"firewall",col:"#ef4444",ms:780},
+    {label:"DC-1 Core",     icon:"switch",  col:"#f97316",ms:900},
   ];
   return [
     {label:"Access Switch", icon:"switch",  col:"#38bdf8",ms:0},
     {label:"Core Switch",   icon:"switch",  col:"#38bdf8",ms:130},
     {label:"Firewall",      icon:"firewall",col:"#ef4444",ms:270},
     {label:"SD-WAN Edge",   icon:"sdwan",   col:"#06b6d4",ms:400},
-    {label:"ISP x4",        icon:"isp",     col:"#a855f7",ms:530},
+    {label:ispLabel,         icon:"isp",     col:"#a855f7",ms:530},
     {label:"iNET / Cloud",  icon:"cloud",   col:"#6366f1",ms:660},
   ];
 }
@@ -134,20 +140,85 @@ const SITE_LINKS = [
 
 const SITE_TRAFFIC_PATH = ["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"];
 
-function solutionDescription(id,siteLabel){
-  const map={
-    access:`End devices in ${siteLabel} enter the LAN through access switching before moving to core/security layers.`,
-    core:"Core switching aggregates local VLANs and forwards traffic toward firewall and SD-WAN services.",
-    firewall:"The firewall inspects north-south traffic, applies policies, and allows only approved application flows.",
-    sdwan:"SD-WAN chooses the healthiest ISP path and keeps branch/HQ traffic visible across the WAN fabric.",
-    isp:"Four ISP links provide active/backup WAN transport with animated live path indicators.",
-    inet:"The iNET fabric carries traffic between HQ, branches, DC-1, DR-1, and cloud-facing services.",
-    dcfw:"DC-1 firewall protects traffic entering application and server zones.",
-    dccore:"DC-1 core forwards approved traffic to application, AD, mail, web, and backup networks.",
-    apps:"Application, AD, web, and mail servers are the destination services for user traffic.",
-    veeam:"Veeam receives protected workload/backup traffic after application processing.",
+function getSiteSolutionFlow(site,id){
+  const siteLabel=SITES[site]?.label||site?.toUpperCase?.()||"SITE";
+  const ispCount=getSiteIspCount(site);
+  const flows={
+    access:{
+      path:["access"],
+      visible:["access"],
+      showDevices:true,
+      description:`This view shows how endpoint traffic starts in the end devices zone and lands on the ${siteLabel} access layer.`
+    },
+    core:{
+      path:["access","core"],
+      visible:["access","core"],
+      showDevices:true,
+      description:`This view shows the normal path from end devices into the access switch and then into the ${siteLabel} core switch for LAN aggregation and routing.`
+    },
+    firewall:{
+      path:["access","core","firewall"],
+      visible:["access","core","firewall"],
+      showDevices:true,
+      description:`This view shows endpoint traffic moving from the end devices zone through access and core switching, then reaching the firewall for local inspection and policy enforcement.`
+    },
+    sdwan:{
+      path:["access","core","firewall","sdwan"],
+      visible:["access","core","firewall","sdwan"],
+      showDevices:true,
+      description:`This view shows user traffic moving from end devices through access, core, and firewall, then arriving at the SD-WAN edge for WAN path selection.`
+    },
+    isp:{
+      path:["access","core","firewall","sdwan","isp"],
+      visible:["access","core","firewall","sdwan","isp"],
+      showDevices:true,
+      description:`This view shows the WAN handoff path: end devices → access → core → firewall → SD-WAN → ${ispCount}-link ISP bundle.`
+    },
+    inet:{
+      path:["access","core","firewall","sdwan","isp","inet"],
+      visible:["access","core","firewall","sdwan","isp","inet"],
+      showDevices:true,
+      description:`This view shows the inter-site transport path from end devices through the local site stack and out across ${ispCount} ISP uplinks into the iNET fabric.`
+    },
+    dcfw:{
+      path:["access","core","firewall","sdwan","isp","inet","dcfw"],
+      visible:["access","core","firewall","sdwan","isp","inet","dcfw"],
+      showDevices:true,
+      description:`This view shows the secure path from end devices through the local site and iNET, ending at the Imperva / DC security layer for data center entry inspection.`
+    },
+    apps:{
+      path:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps"],
+      visible:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps"],
+      showDevices:true,
+      description:`This view shows business-service access from end devices through the full site and WAN path into the DC core and finally the Apps / AD / Mail service zone.`
+    },
+    veeam:{
+      path:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"],
+      visible:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"],
+      showDevices:true,
+      description:`This view shows the backup-related path from end devices through the local site, WAN, iNET, and DC services, ending at the Veeam backup and recovery platform.`
+    },
   };
-  return map[id]||"Click a solution or end device to show how traffic moves through this site topology.";
+  return flows[id] || {
+    path:["access","core","firewall","sdwan"],
+    visible:["access","core","firewall","sdwan"],
+    showDevices:true,
+    description:"Click a solution or end device to show the actual traffic path starting from end devices and continuing only through the components used by that solution."
+  };
+}
+
+function getSiteDeviceFlow(site,device){
+  const ispCount=getSiteIspCount(site);
+  return {
+    path:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"],
+    visible:["access","core","firewall","sdwan","isp","inet","dcfw","dccore","apps","veeam"],
+    showDevices:true,
+    description:`${device?.label||"Selected endpoint"} traffic is highlighted end-to-end from the end devices zone through access, core, firewall, SD-WAN, the ${ispCount}-link ISP bundle, the iNET fabric, and into DC service and backup zones.`
+  };
+}
+
+function solutionDescription(id,siteLabel){
+  return getSiteSolutionFlow("hq", id).description;
 }
 
 function getSiteDevicePositions(site){
@@ -174,12 +245,13 @@ const DC_BAND = { left: 7, width: 86 };
 
 function getSiteSolutionCatalog(site){
   const siteLabel=SITES[site]?.label||site?.toUpperCase?.()||"SITE";
+  const ispCount=getSiteIspCount(site);
   return [
     {id:"access", title:`${siteLabel} Access Network`, sub:"Endpoints / VLAN access"},
     {id:"core", title:"Core Switching", sub:"LAN aggregation / routing"},
     {id:"firewall", title:"Sophos Firewall", sub:"North-south policy control"},
     {id:"sdwan", title:"SD-WAN Edge", sub:"Path steering / WAN control"},
-    {id:"isp", title:"4× ISP Bundle", sub:"Multi-homed transport"},
+    {id:"isp", title:`${ispCount}× ISP Bundle`, sub:"Site WAN uplinks"},
     {id:"inet", title:"iNET Fabric", sub:"Inter-site secure transport"},
     {id:"dcfw", title:"Imperva / DC Security", sub:"DC entry inspection"},
     {id:"apps", title:"Apps / AD / Mail", sub:"Business service landing zone"},
@@ -239,13 +311,22 @@ function SiteTopoNode({node,isActive,onClick}){
 function SiteTopologyView({site}){
   const [selected,setSelected]=useState({type:"solution",id:"sdwan",label:"SD-WAN Edge",icon:"sdwan",col:"#38bdf8"});
   const s=SITES[site];
-  const solutionNodes=SITE_SOLUTION_TEMPLATE.map(n=>({...n, x: mapIntoBand(n.x, SITE_BAND.left, SITE_BAND.width)}));
+  const ispLabel=`${getSiteIspCount(site)}×ISP`;
+  const solutionNodes=SITE_SOLUTION_TEMPLATE.map(n=>({
+    ...n,
+    label:n.id==="isp"?ispLabel:n.label,
+    x: mapIntoBand(n.x, SITE_BAND.left, SITE_BAND.width)
+  }));
   const deviceNodes=getSiteDevicePositions(site).map(d=>({...d, x: mapIntoBand(d.x, SITE_BAND.left, SITE_BAND.width)}));
   const nodeById=Object.fromEntries(solutionNodes.map(n=>[n.id,n]));
   const solutionCatalog=getSiteSolutionCatalog(site);
-  const pathIndex=selected?.type==="solution"?SITE_TRAFFIC_PATH.indexOf(selected.id):SITE_TRAFFIC_PATH.length-1;
-  const activePath=SITE_TRAFFIC_PATH.slice(0,Math.max(pathIndex+1,2));
-  const activeLinks=new Set((selected?.type==="device"?SITE_LINKS:activePath.slice(0,-1).map((id,i)=>[id,activePath[i+1]])).map(([a,b])=>`${a}-${b}`));
+  const flowConfig=selected?.type==="device" ? getSiteDeviceFlow(site,selected) : getSiteSolutionFlow(site,selected?.id);
+  const activePath=flowConfig.path;
+  const visibleNodeIds=new Set(flowConfig.visible || activePath);
+  const showDevices=selected?.type==="device" ? true : !!flowConfig.showDevices;
+  const activeLinks=new Set(activePath.slice(0,-1).map((id,i)=>`${id}-${activePath[i+1]}`));
+  const visibleSolutionNodes=solutionNodes.filter(n=>visibleNodeIds.has(n.id));
+  const visibleDeviceNodes=showDevices ? deviceNodes : [];
   const SelectedIcon=Ic[selected?.icon]||Ic.activity;
 
   return(
@@ -295,10 +376,11 @@ function SiteTopologyView({site}){
             </defs>
             <circle cx="960" cy="395" r="120" fill={`url(#siteInet-${site})`}/>
             {SITE_LINKS.map(([a,b],i)=>{
+              if(!visibleNodeIds.has(a) || !visibleNodeIds.has(b)) return null;
               const n1=nodeById[a], n2=nodeById[b];
               const x1=n1.x/100*1280, y1=n1.y/100*720, x2=n2.x/100*1280, y2=n2.y/100*720;
               const col=n2.col||s.col;
-              const active=activeLinks.has(`${a}-${b}`)||selected?.type==="device";
+              const active=activeLinks.has(`${a}-${b}`);
               const cx=(x1+x2)/2, cy=(y1+y2)/2-((a==="isp"||b==="isp")?48:0);
               const d=`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
               return(
@@ -319,7 +401,7 @@ function SiteTopologyView({site}){
                 </g>
               );
             })}
-            {deviceNodes.map((d,i)=>{
+            {visibleDeviceNodes.map((d,i)=>{
               const access=nodeById.access;
               const x1=d.x/100*1280,y1=d.y/100*720,x2=access.x/100*1280,y2=access.y/100*720;
               const active=selected?.id===d.id;
@@ -335,7 +417,7 @@ function SiteTopologyView({site}){
             {s.label} LIVE SITE TOPOLOGY
           </div>
 
-          {deviceNodes.map(d=>{
+          {visibleDeviceNodes.map(d=>{
             const I=Ic[d.type]||Ic.desktop;
             const isActive=selected?.id===d.id;
             return(
@@ -351,19 +433,15 @@ function SiteTopologyView({site}){
             );
           })}
 
-          {(() => {
-            const xs = deviceNodes.map(d => d.x);
-            const ys = deviceNodes.map(d => d.y);
-
-            // Change these values if you want more/less space around the devices.
+          {showDevices && visibleDeviceNodes.length > 0 && (() => {
+            const xs = visibleDeviceNodes.map(d => d.x);
+            const ys = visibleDeviceNodes.map(d => d.y);
             const paddingX = 5;
             const paddingY = 6;
-
             const minX = Math.min(...xs);
             const maxX = Math.max(...xs);
             const minY = Math.min(...ys);
             const maxY = Math.max(...ys);
-
             const left = minX - paddingX;
             const top = minY - paddingY;
             const width = maxX - minX + paddingX * 2;
@@ -406,7 +484,7 @@ function SiteTopologyView({site}){
               </>
             );
           })()}
-          {solutionNodes.map(n=><SiteTopoNode key={n.id} node={n} isActive={selected?.id===n.id} onClick={()=>setSelected({type:"solution",...n})}/>) }
+          {visibleSolutionNodes.map(n=><SiteTopoNode key={n.id} node={n} isActive={selected?.id===n.id} onClick={()=>setSelected({type:"solution",...n})}/>) }
         </div>
 
         <div className="overlay-panel overlay-panel-right">
@@ -426,14 +504,14 @@ function SiteTopologyView({site}){
               {selected?.type==="device"?`${selected.ip} · ${selected.os}`:"Solution traffic visibility"}
             </div>
             <p style={{fontSize:11.5,lineHeight:1.6,color:"#7fb6d8"}}>
-              {selected?.type==="device"?`${selected.label} traffic is highlighted from endpoint → access switch → core → firewall → SD-WAN → ISP → iNET → DC-1 services → backup.`:solutionDescription(selected?.id,s.label)}
+              {flowConfig.description}
             </p>
           </div>
 
           <div>
             <div style={{fontSize:10,fontWeight:700,color:"#7fb6d8",marginBottom:8}}>Highlighted Path</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {(selected?.type==="device"?SITE_TRAFFIC_PATH:SITE_TRAFFIC_PATH.slice(0,Math.max(pathIndex+1,2))).map((id,i)=>{
+              {activePath.map((id,i)=>{
                 const n=nodeById[id];
                 return <span key={id} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:7.5,color:n?.col||s.col,border:`1px solid ${(n?.col||s.col)}35`,borderRadius:999,padding:"4px 7px",background:`${(n?.col||s.col)}0f`}}>{i+1}. {n?.label||id}</span>
               })}
@@ -583,158 +661,105 @@ function IspNode({isp}){
 function OverviewMap({activeSite,onSiteClick}){
   const [hov,setHov]=useState(null);
 
-  // Node positions (% of 1100×620 viewBox)
   const POS={
     hq: {x:8,  y:32},
     b1: {x:8,  y:62},
     b2: {x:38, y:75},
     dc1:{x:74, y:22},
     dr1:{x:74, y:62},
-
   };
   const INET={x:50,y:46};
 
-  const links=[
-    {from:"hq", col:"#38bdf8",bw:"10G",  dur:"1.6s",width:2.5},
-    {from:"dc1",col:"#f97316",bw:"10G",  dur:"1.4s",width:2.5},
-
-    {from:"dr1",col:"#a855f7",bw:"1G",   dur:"2s",  width:1.5},
-
-    {from:"b1", col:"#10b981",bw:"1G",   dur:"2.1s",width:1.5},
-    {from:"b2", col:"#06b6d4",bw:"500M", dur:"2.4s",width:1.2},
+  const linkGroups=[
+    {site:"hq",  col:"#38bdf8", count:4, label:"4 WAN uplinks", dur:"1.15s", width:2.35, bend:-34},
+    {site:"b1",  col:"#10b981", count:2, label:"2 WAN uplinks", dur:"1.7s",  width:1.7,  bend:24},
+    {site:"b2",  col:"#06b6d4", count:2, label:"2 WAN uplinks", dur:"1.9s",  width:1.7,  bend:56},
+    {site:"dc1", col:"#f97316", count:1, label:"DC uplink",    dur:"1.35s", width:2.2,  bend:-26},
+    {site:"dr1", col:"#a855f7", count:1, label:"DR uplink",    dur:"1.8s",  width:1.6,  bend:28},
   ];
+
+  const badgeMap={hq:"4 LINKS", b1:"2 LINKS", b2:"2 LINKS", dc1:"DC WAN", dr1:"DR WAN"};
 
   return(
     <div style={{position:"relative",width:"100%",height:580}}>
       <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}
         viewBox="0 0 1100 580" preserveAspectRatio="xMidYMid meet">
         <defs>
-          <radialGradient id="inetGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18"/>
-            <stop offset="60%" stopColor="#6366f1" stopOpacity="0.08"/>
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0"/>
-          </radialGradient>
+          <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+            <circle cx="15" cy="15" r="0.8" fill="#0a2a4a" opacity="0.7"/>
+          </pattern>
           <filter id="glow-svg"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
           <filter id="glow-sm"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          {/* ISP ring gradient */}
-          <radialGradient id="ispRing" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.12"/>
-            <stop offset="100%" stopColor="#a855f7" stopOpacity="0"/>
+          <radialGradient id="inetAura" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18"/>
+            <stop offset="55%" stopColor="#6366f1" stopOpacity="0.08"/>
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0"/>
           </radialGradient>
         </defs>
 
-        {/* Background grid dots */}
-        <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
-          <circle cx="15" cy="15" r="0.8" fill="#0a2a4a" opacity="0.7"/>
-        </pattern>
         <rect width="1100" height="580" fill="url(#dots)"/>
+        <circle cx="550" cy="267" r="118" fill="url(#inetAura)"/>
 
-        {/* iNET ambient glow */}
-        <circle cx="550" cy="267" r="110" fill="url(#inetGrad)"/>
-
-        {/* iNET rings */}
-        <circle cx="550" cy="267" r="60" fill="rgba(2,14,32,0.95)" stroke="#0f3a60" strokeWidth="1"/>
-        <circle cx="550" cy="267" r="72" fill="none" stroke="#38bdf8" strokeWidth="0.6" strokeDasharray="5,8" opacity="0.45">
-          <animateTransform attributeName="transform" type="rotate" from="0 550 267" to="360 550 267" dur="18s" repeatCount="indefinite"/>
-        </circle>
-        <circle cx="550" cy="267" r="85" fill="none" stroke="#6366f1" strokeWidth="0.4" strokeDasharray="3,10" opacity="0.25">
-          <animateTransform attributeName="transform" type="rotate" from="360 550 267" to="0 550 267" dur="28s" repeatCount="indefinite"/>
-        </circle>
-        <circle cx="550" cy="267" r="98" fill="none" stroke="#a855f7" strokeWidth="0.3" strokeDasharray="2,14" opacity="0.15">
-          <animateTransform attributeName="transform" type="rotate" from="0 550 267" to="360 550 267" dur="40s" repeatCount="indefinite"/>
-        </circle>
-        <text x="550" y="262" textAnchor="middle" fontSize="13" fill="#38bdf8"
-          fontFamily="'JetBrains Mono',monospace" fontWeight="800" letterSpacing="0.2em" filter="url(#glow-sm)">iNET</text>
-        <text x="550" y="278" textAnchor="middle" fontSize="8" fill="#2a5a8a"
-          fontFamily="'JetBrains Mono',monospace" letterSpacing="0.25em">SD-WAN FABRIC</text>
-
-        {/* ISP cloud above iNET */}
-        <circle cx="550" cy="110" r="44" fill="rgba(2,14,32,0.9)" stroke="#1a3a60" strokeWidth="1"/>
-        <circle cx="550" cy="110" r="55" fill="url(#ispRing)"/>
-        <circle cx="550" cy="110" r="54" fill="none" stroke="#a855f7" strokeWidth="0.5" strokeDasharray="4,6" opacity="0.35">
-          <animateTransform attributeName="transform" type="rotate" from="0 550 110" to="360 550 110" dur="12s" repeatCount="indefinite"/>
-        </circle>
-        <text x="550" y="105" textAnchor="middle" fontSize="10" fill="#a855f7"
-          fontFamily="'JetBrains Mono',monospace" fontWeight="800" letterSpacing="0.15em" filter="url(#glow-sm)">4 × ISP</text>
-        <text x="550" y="119" textAnchor="middle" fontSize="7.5" fill="#3a4a6a"
-          fontFamily="'JetBrains Mono',monospace" letterSpacing="0.2em">MULTI-HOMED</text>
-
-        {/* ISP → iNET vertical trunk — thick glowing */}
-        <line x1="550" y1="154" x2="550" y2="207" stroke="#a855f7" strokeWidth="3" opacity="0.15"/>
-        <line x1="550" y1="154" x2="550" y2="207" stroke="#a855f7" strokeWidth="1.5" strokeDasharray="6,3" opacity="0.7" filter="url(#glow-sm)">
-          <animate attributeName="stroke-dashoffset" from="9" to="0" dur="0.6s" repeatCount="indefinite"/>
-        </line>
-        {[0,0.4,0.8].map(o=>(
-          <circle key={o} r="4" fill="#a855f7" filter="url(#glow-sm)">
-            <animateMotion dur="0.8s" repeatCount="indefinite" begin={`-${0.8*o}s`}><mpath href="#trunk"/></animateMotion>
-          </circle>
-        ))}
-        <path id="trunk" d="M550,154 L550,207" fill="none"/>
-
-        {/* ISP individual lines */}
-        {ISPS.map((isp,i)=>{
-          const angles=[-55,-20,20,55];
-          const a=angles[i]*Math.PI/180;
-          const ex=550+62*Math.sin(a), ey=110-62*Math.cos(a);
-          const ix=550+44*Math.sin(a), iy=110-44*Math.cos(a);
-          return(
-            <g key={isp.id}>
-              <line x1={ix} y1={iy} x2={ex} y2={ey} stroke={isp.col} strokeWidth="2" opacity="0.1"/>
-              <line x1={ix} y1={iy} x2={ex} y2={ey} stroke={isp.col} strokeWidth="1.5"
-                strokeDasharray="4,3" opacity="0.6" filter="url(#glow-sm)">
-                <animate attributeName="stroke-dashoffset" from="7" to="0" dur={`${0.5+i*0.1}s`} repeatCount="indefinite"/>
-              </line>
+        {linkGroups.map(group=>{
+          const p=POS[group.site];
+          const x1=p.x/100*1100;
+          const y1=p.y/100*580;
+          const x2=INET.x/100*1100;
+          const y2=INET.y/100*580;
+          const dx=x2-x1;
+          const dy=y2-y1;
+          const len=Math.hypot(dx,dy)||1;
+          const nx=-dy/len;
+          const ny=dx/len;
+          const offsets=Array.from({length:group.count},(_,i)=>(i-(group.count-1)/2)*10);
+          const isHov=hov===group.site||activeSite===group.site;
+          const midX=(x1+x2)/2;
+          const midY=(y1+y2)/2 + group.bend - 18;
+          return (
+            <g key={group.site}>
+              {offsets.map((off,idx)=>{
+                const sx=x1+nx*off;
+                const sy=y1+ny*off;
+                const tx=x2+nx*off*0.2;
+                const ty=y2+ny*off*0.12;
+                const cx=(sx+tx)/2 + nx*off*0.4;
+                const cy=(sy+ty)/2 + group.bend + (idx-(group.count-1)/2)*2;
+                const id=`ov-${group.site}-${idx}`;
+                const d=`M${sx},${sy} Q${cx},${cy} ${tx},${ty}`;
+                return (
+                  <g key={id}>
+                    <path d={d} fill="none" stroke={group.col} strokeWidth={group.width*3} opacity={isHov?0.18:0.07}/>
+                    <path id={id} d={d} fill="none" stroke={group.col}
+                      strokeWidth={isHov?group.width*1.55:group.width}
+                      strokeDasharray="8,5" opacity={isHov?0.98:0.56}
+                      filter={isHov?"url(#glow-sm)":"none"}>
+                      <animate attributeName="stroke-dashoffset" from="13" to="0" dur={group.dur} repeatCount="indefinite"/>
+                    </path>
+                    <circle r={isHov?5.8:4.2} fill={group.col} filter="url(#glow-sm)" opacity={isHov?1:0.78}>
+                      <animateMotion dur={group.dur} repeatCount="indefinite" begin={`-${idx*0.18}s`}>
+                        <mpath href={`#${id}`}/>
+                      </animateMotion>
+                    </circle>
+                    <circle r={isHov?3.6:2.8} fill={group.col} opacity={isHov?0.55:0.34}>
+                      <animateMotion dur={group.dur} repeatCount="indefinite" begin={`-${0.55+idx*0.12}s`}>
+                        <mpath href={`#${id}`}/>
+                      </animateMotion>
+                    </circle>
+                  </g>
+                );
+              })}
+              {isHov&&(
+                <g>
+                  <rect x={midX-38} y={midY-10} width="76" height="18" rx="5" fill={`${group.col}20`} stroke={`${group.col}88`} strokeWidth="0.8"/>
+                  <text x={midX} y={midY+2} textAnchor="middle" fontSize="9" fill={group.col}
+                    fontFamily="'JetBrains Mono',monospace" fontWeight="700" letterSpacing="0.08em">{group.label}</text>
+                </g>
+              )}
             </g>
           );
         })}
 
-        {/* Site ↔ iNET links */}
-        {links.map(l=>{
-          const p=POS[l.from];
-          const x1=p.x/100*1100, y1=p.y/100*580;
-          const x2=550, y2=267;
-          const cx=(x1+x2)/2, cy=(y1+y2)/2-(Math.abs(x1-x2)*0.18);
-          const isHov=hov===l.from||activeSite===l.from;
-          return(
-            <g key={l.from}>
-              {/* Thick glow underlay */}
-              <path d={`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`} fill="none"
-                stroke={l.col} strokeWidth={l.width*3} opacity={isHov?"0.18":"0.08"}
-                style={{transition:"opacity 0.3s"}}/>
-              {/* Main line */}
-              <path d={`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`} fill="none"
-                stroke={l.col} strokeWidth={isHov?l.width*1.6:l.width}
-                strokeDasharray="8,5" opacity={isHov?"0.95":"0.55"}
-                filter={isHov?"url(#glow-sm)":"none"}
-                style={{transition:"all 0.3s"}}>
-                <animate attributeName="stroke-dashoffset" from="13" to="0" dur={l.dur} repeatCount="indefinite"/>
-              </path>
-              {/* Packet 1 */}
-              <circle r={isHov?6:4.5} fill={l.col} filter="url(#glow-sm)" opacity={isHov?1:0.8}>
-                <animateMotion dur={l.dur} repeatCount="indefinite">
-                  <mpath href={`#lp-${l.from}`}/>
-                </animateMotion>
-              </circle>
-              {/* Packet 2 */}
-              <circle r={isHov?4:3} fill={l.col} opacity={isHov?0.6:0.4}>
-                <animateMotion dur={l.dur} repeatCount="indefinite" begin={`-${parseFloat(l.dur)/2}s`}>
-                  <mpath href={`#lp-${l.from}`}/>
-                </animateMotion>
-              </circle>
-              <path id={`lp-${l.from}`} d={`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`} fill="none"/>
-              {/* BW label */}
-              {isHov&&<>
-                <rect x={cx-16} y={cy-20} width={32} height={16} rx="4"
-                  fill={`${l.col}22`} stroke={`${l.col}88`} strokeWidth="0.8"/>
-                <text x={cx} y={cy-9} textAnchor="middle" fontSize="9" fill={l.col}
-                  fontFamily="'JetBrains Mono',monospace" fontWeight="700">{l.bw}</text>
-              </>}
-            </g>
-          );
-        })}
-
-        {/* DC-1 ↔ DR-1 replication */}
-        {[["dc1","dr1","#a855f7"]].map(([a,b,col],i)=>{
+        {[['dc1','dr1','#a855f7']].map(([a,b,col],i)=>{
           const pa=POS[a],pb=POS[b];
           const x1=pa.x/100*1100,y1=pa.y/100*580,x2=pb.x/100*1100,y2=pb.y/100*580;
           return(
@@ -758,18 +783,36 @@ function OverviewMap({activeSite,onSiteClick}){
         })}
       </svg>
 
-      {/* ISP nodes top center */}
-      <div style={{position:"absolute",left:"50%",top:"5%",transform:"translateX(-50%)",
-        display:"flex",gap:28,zIndex:5}}>
-        {ISPS.map(isp=><IspNode key={isp.id} isp={isp}/>)}
+      <div style={{
+        position:"absolute",left:`${INET.x}%`,top:`${INET.y}%`,transform:"translate(-50%,-50%)",
+        width:138,height:138,borderRadius:"50%",zIndex:6,pointerEvents:"none",
+        background:"radial-gradient(circle at 50% 45%, rgba(56,189,248,.22), rgba(8,28,56,.95) 58%, rgba(2,14,32,.98) 100%)",
+        border:"1px solid #0f3a60",
+        boxShadow:"0 0 42px rgba(56,189,248,.18), inset 0 0 32px rgba(99,102,241,.12)",
+        display:"grid",placeItems:"center"
+      }}>
+        <div style={{position:"absolute",inset:12,borderRadius:"50%",border:"1px dashed rgba(56,189,248,.35)"}}/>
+        <div style={{position:"absolute",inset:28,borderRadius:"50%",border:"1px solid rgba(99,102,241,.28)"}}/>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:28,fontWeight:900,letterSpacing:"0.16em",color:"#7dd3fc",textShadow:"0 0 14px rgba(56,189,248,.55)"}}>iNET</div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"#4b93c0",letterSpacing:"0.28em"}}>SD-WAN FABRIC</div>
+        </div>
       </div>
 
-      {/* Building nodes */}
-      <div style={{position:"absolute",left:"4%", top:"18%",zIndex:5}}><Building site="hq" onClick={()=>onSiteClick("hq")} isActive={activeSite==="hq"} hovered={hov==="hq"} onHover={setHov}/></div>
-      <div style={{position:"absolute",left:"4%", top:"53%",zIndex:5}}><Building site="b1" onClick={()=>onSiteClick("b1")} isActive={activeSite==="b1"} hovered={hov==="b1"} onHover={setHov}/></div>
-      <div style={{position:"absolute",left:"34%",top:"65%",zIndex:5}}><Building site="b2" onClick={()=>onSiteClick("b2")} isActive={activeSite==="b2"} hovered={hov==="b2"} onHover={setHov}/></div>
-      <div style={{position:"absolute",right:"18%",top:"10%",zIndex:5}}><Building site="dc1" onClick={()=>onSiteClick("dc1")} isActive={activeSite==="dc1"} hovered={hov==="dc1"} onHover={setHov}/></div>
-      <div style={{position:"absolute",right:"18%",top:"54%",zIndex:5}}><Building site="dr1" onClick={()=>onSiteClick("dr1")} isActive={activeSite==="dr1"} hovered={hov==="dr1"} onHover={setHov}/></div>
+      {[
+        {site:"hq", left:"4%", top:"18%"},
+        {site:"b1", left:"4%", top:"53%"},
+        {site:"b2", left:"34%", top:"65%"},
+        {site:"dc1", right:"18%", top:"10%"},
+        {site:"dr1", right:"18%", top:"54%"},
+      ].map(item=>(
+        <div key={item.site} style={{position:"absolute",zIndex:5,...item}}>
+          <Building site={item.site} onClick={()=>onSiteClick(item.site)} isActive={activeSite===item.site} hovered={hov===item.site} onHover={setHov}/>
+          <div style={{position:"absolute",top:-18,left:"50%",transform:"translateX(-50%)",padding:"3px 8px",borderRadius:999,
+            background:`${SITES[item.site].col}12`,border:`1px solid ${SITES[item.site].col}33`,
+            fontFamily:"'JetBrains Mono',monospace",fontSize:7.4,color:SITES[item.site].col,letterSpacing:".12em"}}>{badgeMap[item.site]}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1300,7 +1343,7 @@ export default function App(){
                 letterSpacing:"0.16em",textTransform:"uppercase",marginTop:2}}>
                 {site
                   ?`${site.toUpperCase()} · ${isTopo?"Internal Topology":"Site Topology & Live Traffic"}`
-                  :"HQ · DC-1 · DR-1 · Branch-1 · Branch-2 · 4×ISP SD-WAN"}
+                  :"HQ · DC-1 · DR-1 · Branch-1 · Branch-2 · iNET SD-WAN"}
               </div>
             </div>
             {/* Scanning indicator */}
@@ -1332,7 +1375,7 @@ export default function App(){
                     {col:"#f97316",label:"DC-1 — Data Center"},
                     {col:"#a855f7",label:"DR-1 — Disaster Recovery"},
                     {col:"#10b981",label:"Branch Offices"},
-                    {col:"#a855f7",label:"4×ISP Multi-Homed SD-WAN"},
+                    {col:"#38bdf8",label:"Multi-link site WAN to iNET"},
                   ].map((l,i)=>(
                     <div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
                       <div style={{width:7,height:7,borderRadius:2,background:l.col,
@@ -1342,7 +1385,7 @@ export default function App(){
                   ))}
                   <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5}}>
                     <div style={{width:5,height:5,borderRadius:"50%",background:"#38bdf8",animation:"blink 2s infinite"}}/>
-                    <span>Hover buildings for glow · Click to drill-in</span>
+                    <span>Hover buildings for glow · Click to drill in</span>
                   </div>
                 </div>
                 <div className="overview-map-shell"><OverviewMap activeSite={site} onSiteClick={setSite}/></div>
@@ -1384,7 +1427,7 @@ export default function App(){
           display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,
           fontFamily:"'JetBrains Mono',monospace",fontSize:8.5,color:"#0f3a60",
           letterSpacing:"0.16em",textTransform:"uppercase"}}>
-          <span>Enterprise Network Ops · SD-WAN · 4×ISP · Veeam Protected</span>
+          <span>Enterprise Network Ops · SD-WAN · Multi-Link iNET · Veeam Protected</span>
           <span>1×DC · 1×DR · HQ · 2×Branch · © 2026</span>
         </div>
       </div>
